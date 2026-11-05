@@ -15,6 +15,7 @@ pub fn build(page: &Page) {
     let summary = widgets::label("", "dim");
     summary.add_css_class("mono");
     summary.set_hexpand(true);
+    summary.set_ellipsize(gtk::pango::EllipsizeMode::End);
     toolbar.append(&summary);
     let table = TrackTable::new(Options { key: Some("songs"), ..Default::default() });
     let filter = views::filter_entry(&table, "Filter songs");

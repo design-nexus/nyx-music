@@ -118,7 +118,8 @@ fn main() -> glib::ExitCode {
         unsafe { std::env::set_var("GSK_RENDERER", "ngl") };
     }
 
-    let app = gtk::Application::builder().application_id(APP_ID).flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE).build();
+    let id = std::env::var("NYX_MUSIC_APP_ID").unwrap_or_else(|_| APP_ID.to_string());
+    let app = gtk::Application::builder().application_id(&id).flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE).build();
     // Nyx Assistant plays and reads the library through this (primary instance only).
     app.connect_startup(|app| nyx_core::control::serve_async(app, control::tools(), control::handle));
     app.connect_command_line(|app, cl| {

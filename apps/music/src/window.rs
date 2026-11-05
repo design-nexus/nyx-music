@@ -211,7 +211,17 @@ fn build(app: &gtk::Application) {
     let frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
     frame.add_css_class("window-frame");
     frame.append(&header.root);
-    frame.append(&body);
+    // The body's minimum width doesn't hold the window open: a tiled window gets
+    // the compositor's width even while the wide layout is wider, and goes narrow.
+    let body_scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::External)
+        .vscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_width(true)
+        .propagate_natural_height(true)
+        .vexpand(true)
+        .child(&body)
+        .build();
+    frame.append(&body_scroll);
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&frame));
@@ -219,12 +229,17 @@ fn build(app: &gtk::Application) {
 
     install_keys(&window, &search);
 
-    // Narrow windows (a tiled half-screen) get an icon-only sidebar.
+    // Narrow windows (a tiled half-screen) get an icon-only sidebar: below 980,
+    // or whenever the wide layout needs more than the window has.
+    let wide_min = Rc::new(std::cell::Cell::new(0));
     let apply_width = {
-        let nav = nav.clone();
+        let (nav, body) = (nav.clone(), body.clone());
         move |w: &gtk::ApplicationWindow| {
             let width = if w.width() > 0 { w.width() } else { w.default_width() };
-            let narrow = width > 0 && width < 980;
+            if !NARROW.with(|n| n.get()) {
+                wide_min.set(body.measure(gtk::Orientation::Horizontal, -1).0);
+            }
+            let narrow = width > 0 && (width < 980 || width < wide_min.get());
             settings_dialog::fit(w);
             panel_dialog::fit(w);
             if narrow == NARROW.with(|n| n.get()) && nav.has_css_class("sized") {

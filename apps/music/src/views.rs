@@ -278,7 +278,9 @@ pub fn filter_entry(table: &crate::tracklist::TrackTable, placeholder: &str) -> 
     entry.set_placeholder_text(Some(placeholder));
     entry.add_css_class("settings-search");
     entry.add_css_class("page-search");
-    entry.set_width_chars(22);
+    // 22 characters when there's room; a narrow window can squeeze it.
+    entry.set_width_chars(10);
+    entry.set_max_width_chars(22);
     entry.set_valign(gtk::Align::Center);
     let t = table.clone();
     entry.connect_search_changed(move |e| t.set_filter(&e.text()));
