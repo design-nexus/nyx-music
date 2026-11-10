@@ -23,8 +23,9 @@ die() { printf '\033[31m==>\033[0m %s\n' "$*" >&2; exit 1; }
 # ---------- What each app is ----------
 # dir: folder under apps/   pkg: cargo package   bins: programs it installs
 # deps: Arch packages it needs   old_*: what the app was called before Nyx
+# actions: the program that prints the app's action manifest (--describe-actions)
 app_info() {
-  dir=$1 pkg="nyx-$1" bins="nyx-$1" deps="" ids="" old_bins="" old_desktops="" old_icons="" defaults=false
+  dir=$1 pkg="nyx-$1" bins="nyx-$1" deps="" ids="" old_bins="" old_desktops="" old_icons="" defaults=false actions=""
   case $1 in
     settings) ids="Settings" old_bins="settings settings-helper"; bins="nyx-settings nyx-settings-helper nyx-goa-helper" ;;
     glimpse) ids="Glimpse" bins="nyx-glimpse nyx-glimpsed nyx-glimpse-settings" deps="bubblewrap" ;;
@@ -36,7 +37,7 @@ app_info() {
     torrents) ids="Torrents" old_bins="torrents" deps="libtorrent-rasterbar boost" defaults=true ;;
     pdf) ids="Pdf" old_bins="pdf" deps="poppler-glib" defaults=true ;;
     notepad) ids="Notepad" old_bins="notepad" ;;
-    music) ids="Music" old_bins="music" deps="gstreamer gst-plugins-base gst-plugins-good gst-libav" defaults=true ;;
+    music) ids="Music" old_bins="music" deps="gstreamer gst-plugins-base gst-plugins-good gst-libav" defaults=true actions="nyx-music" ;;
     media-player) ids="MediaPlayer" old_bins="media-player" deps="mpv ffmpeg" defaults=true ;;
     theater) ids="Theater" deps="mpv ffmpeg libsecret" ;;
     chat) ids="Chat" old_bins="chat" ;;
@@ -222,6 +223,21 @@ for a in "${apps[@]}"; do
   done
   for f in "$d"/data/io.github.design_nexus.nyx.*.desktop; do install -m 644 "$f" "$desk/"; done
   for id in $ids; do install -m 644 "$src/crates/nyx-icons/apps/io.github.design_nexus.nyx.$id.svg" "$icons/"; done
+  # What the app does for nyx APP …, Glimpse and the Assistant (its manifest), and the
+  # D-Bus service that starts it without a window for a call.
+  if [[ -n $actions && -x $bin/$actions ]]; then
+    mkdir -p "$share/nyx/actions" "$share/dbus-1/services"
+    manifest=$(mktemp)
+    if timeout 10 "$bin/$actions" --describe-actions >"$manifest" 2>/dev/null; then
+      app_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["nyx"]["app"])' "$manifest")
+      install -m 644 "$manifest" "$share/nyx/actions/$app_id.json"
+      if python3 -c 'import json,sys; n=json.load(open(sys.argv[1]))["nyx"]; sys.exit(0 if n["activation"] == "dbus" and n["bus_name"] == n["app"] else 1)' "$manifest"; then
+        printf '[D-BUS Service]\nName=%s\nExec=%s --gapplication-service\n' "$app_id" "$bin/$actions" >"$share/dbus-1/services/$app_id.service"
+      fi
+    fi
+    rm -f "$manifest"
+    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
+  fi
   if [[ $a == news && -f ${CARGO_TARGET_DIR:-$src/target}/release/nyx-news-glimpse ]]; then
     plug="$share/nyx-news/glimpse"
     mkdir -p "$plug"

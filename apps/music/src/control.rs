@@ -1,22 +1,161 @@
-//! Music's tools on the control interface (`nyx_core::control`), for Nyx Assistant: find
-//! and play from the library, queue, and read what's playing, without the window.
+//! Music's actions on the control interface (`nyx_core::control`, API 2), for the `nyx`
+//! command, Glimpse and Nyx Assistant: find and play from the library, queue, volume,
+//! read what's playing, and the live `playback` and `playlists` topics Glimpse's Music
+//! panel shows. Worked out only while something watches.
 
 use crate::library::{store, Track};
 use crate::player::{self, queue::Repeat, State};
+use gtk::prelude::*;
 use nyx_core::control::{text, Reply};
 use serde_json::{json, Value};
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-pub fn tools() -> Value {
-    let what = json!({"enum": ["track", "album", "artist", "playlist"]});
-    json!([
-        {"name": "music.search", "description": "Search the music library: tracks, albums, artists and playlists matching the words.", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
-        {"name": "music.play", "description": "Play a track, album, artist or playlist from the library (by name), optionally shuffled.", "inputSchema": {"type": "object", "properties": {"what": what, "name": {"type": "string"}, "shuffle": {"type": "boolean"}}, "required": ["what", "name"]}},
-        {"name": "music.queue", "description": "Add a track, album, artist or playlist to the queue: next, or at the end.", "inputSchema": {"type": "object", "properties": {"what": what, "name": {"type": "string"}, "next": {"type": "boolean"}}, "required": ["what", "name"]}},
-        {"name": "music.status", "description": "What Music is playing: track, artist, album, playing or paused, shuffle, repeat, what's next.", "inputSchema": {"type": "object", "properties": {}}},
-        {"name": "music.control", "description": "Play, pause, toggle, next, previous or stop in Music; or set shuffle on/off.", "inputSchema": {"type": "object", "properties": {"action": {"enum": ["play", "pause", "toggle", "next", "previous", "stop", "shuffle_on", "shuffle_off"]}}, "required": ["action"]}},
-    ])
+/// Music's description: its actions, topics and Glimpse panel (`app_id` is the running
+/// ID, which a test copy changes).
+pub fn description(app_id: &str) -> Value {
+    let what = json!({"enum": ["track", "album", "artist", "playlist"], "description": "what the name is"});
+    let alias = |word: &str, action: &str| json!({"word": word, "arguments": {"action": action}});
+    json!({
+        "tools": [
+            {"name": "music.search", "description": "Search the music library: tracks, albums, artists and playlists matching the words.",
+             "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"], "additionalProperties": false},
+             "annotations": {"title": "Search music"}, "x-nyx": {"risk": "read_only", "positional": ["query"], "aliases": ["find"], "result": "object"}},
+            {"name": "music.play", "description": "Play a track, album, artist or playlist from the library (by name), optionally shuffled.",
+             "inputSchema": {"type": "object", "properties": {"what": what, "name": {"type": "string"}, "shuffle": {"type": "boolean"}}, "required": ["what", "name"], "additionalProperties": false},
+             "annotations": {"title": "Play"}, "x-nyx": {"risk": "writes", "positional": ["what", "name"], "result": "object"}},
+            {"name": "music.queue", "description": "Add a track, album, artist or playlist to the queue: next, or at the end.",
+             "inputSchema": {"type": "object", "properties": {"what": what, "name": {"type": "string"}, "next": {"type": "boolean"}}, "required": ["what", "name"], "additionalProperties": false},
+             "annotations": {"title": "Add to the queue"}, "x-nyx": {"risk": "writes", "positional": ["what", "name"], "result": "object"}},
+            {"name": "music.status", "description": "What Music is playing: track, artist, album, playing or paused, shuffle, repeat, what's next.",
+             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+             "annotations": {"title": "Now playing"}, "x-nyx": {"risk": "read_only", "aliases": ["now"], "result": "object"}},
+            {"name": "music.control", "description": "Play, pause, toggle, next, previous or stop in Music; or set shuffle on/off.",
+             "inputSchema": {"type": "object", "properties": {"action": {"enum": ["play", "pause", "toggle", "next", "previous", "stop", "shuffle_on", "shuffle_off"]}}, "required": ["action"], "additionalProperties": false},
+             "annotations": {"title": "Playback control"},
+             "x-nyx": {"risk": "writes", "positional": ["action"], "result": "object",
+                       "aliases": [alias("pause", "pause"), alias("resume", "play"), alias("toggle", "toggle"), alias("next", "next"), alias("previous", "previous"), alias("prev", "previous"), alias("stop", "stop")]}},
+            {"name": "music.volume", "description": "Set Music's volume (0 to 100), or mute and unmute it.",
+             "inputSchema": {"type": "object", "properties": {"level": {"type": "number", "minimum": 0, "maximum": 100}, "muted": {"type": "boolean"}}, "additionalProperties": false},
+             "annotations": {"title": "Volume"}, "x-nyx": {"risk": "writes", "positional": ["level"], "aliases": ["vol"], "result": "object"}},
+            {"name": "music.playlists", "description": "The playlists in the music library.",
+             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+             "annotations": {"title": "Playlists"}, "x-nyx": {"risk": "read_only", "result": "list"}},
+            {"name": "music.open", "description": "Open Music's window, at a page when given.",
+             "inputSchema": {"type": "object", "properties": {"section": {"enum": ["now-playing", "songs", "albums", "artists", "genres", "folders", "recently-added", "recently-played", "most-played", "radio", "podcasts", "queue", "equalizer", "settings"]}}, "additionalProperties": false},
+             "annotations": {"title": "Open Music"}, "x-nyx": {"risk": "writes", "confirmation": "never", "positional": ["section"], "result": "none"}}
+        ],
+        "nyx": {
+            "api": 2, "app": app_id, "name": "Music", "icon": crate::APP_ID, "namespaces": ["music"], "aliases": ["songs"],
+            "bus_name": app_id, "activation": "dbus", "default": "music.search", "open": {"action": "music.open"},
+            "topics": [{"name": "playback"}, {"name": "playlists"}],
+            "panel": {"id": "music", "topics": ["playback", "playlists"], "size": {"min": [420, 320], "preferred": [500, 380]}}
+        }
+    })
+}
+
+thread_local! {
+    static SERVICE: RefCell<Option<nyx_core::control::Service>> = const { RefCell::new(None) };
+    static WATCHED: Cell<(bool, bool)> = const { Cell::new((false, false)) };
+    static LAST_SECOND: Cell<i64> = const { Cell::new(-1) };
+}
+
+/// Register the interface (from `connect_startup`) and keep the topics current while watched.
+pub fn serve(app: &gtk::Application) {
+    let id = app.application_id().map(|s| s.to_string()).unwrap_or_else(|| crate::APP_ID.to_string());
+    let app_for = app.clone();
+    let Some(service) = nyx_core::control::serve_with(app, description(&id), move |request, answer| {
+        handle_with(&app_for, &request.action, request.arguments, Box::new(move |r| answer(r.map_err(|e| nyx_actions::Error::new(nyx_actions::ErrorKind::Failed, e)))));
+    }) else {
+        return;
+    };
+    service.on_watch(|topic, on| {
+        WATCHED.with(|w| {
+            let (p, l) = w.get();
+            w.set(match topic {
+                "playback" => (on, l),
+                "playlists" => (p, on),
+                _ => (p, l),
+            })
+        });
+        if on {
+            publish(topic);
+        }
+    });
+    SERVICE.with(|s| *s.borrow_mut() = Some(service));
+    player::subscribe_global(|e| {
+        if !WATCHED.with(|w| w.get().0) {
+            return;
+        }
+        // The position ticks often; a second is enough for a compact view.
+        if e == player::Event::Position {
+            let second = player::position() as i64;
+            if LAST_SECOND.with(|l| l.replace(second)) == second {
+                return;
+            }
+        }
+        publish("playback");
+    });
+}
+
+fn publish(topic: &str) {
+    SERVICE.with(|s| {
+        let Some(service) = s.borrow().clone() else { return };
+        match topic {
+            "playback" => service.publish("playback", playback()),
+            "playlists" => {
+                let lists: Vec<Value> = store::playlists().into_iter().map(|p| json!({"id": p.id, "name": p.name})).collect();
+                service.publish("playlists", json!({"items": lists}));
+            }
+            _ => {}
+        }
+    });
+}
+
+/// What the panel shows: the song, its cover, where it is, and the player's options.
+fn playback() -> Value {
+    let (volume, muted) = {
+        let p = crate::prefs::get();
+        (p.volume, p.muted)
+    };
+    let mut v = status();
+    v["position"] = json!(player::position().floor());
+    v["duration"] = json!(player::duration().round());
+    v["volume"] = json!((volume * 100.0).round());
+    v["muted"] = json!(muted);
+    v["can_next"] = json!(player::can_next());
+    v["can_previous"] = json!(player::can_previous());
+    v["art"] = json!(player::current()
+        .filter(|t| !t.art.is_empty())
+        .map(|t| crate::library::art::file(&t.art, true))
+        .filter(|f| f.exists())
+        .map(|f| f.display().to_string())
+        .unwrap_or_default());
+    v
+}
+
+/// The window, held while it plays: a headless Music (started for a call) quits when
+/// it's idle, not halfway through a song.
+pub fn hold_while_playing(app: &gtk::Application) {
+    thread_local! {
+        static HOLD: RefCell<Option<gtk::gio::ApplicationHoldGuard>> = const { RefCell::new(None) };
+    }
+    let app = app.clone();
+    player::subscribe_global(move |e| {
+        if e != player::Event::State {
+            return;
+        }
+        let playing = player::state() == State::Playing;
+        HOLD.with(|h| {
+            let mut h = h.borrow_mut();
+            if playing && h.is_none() {
+                *h = Some(app.hold());
+            } else if !playing {
+                *h = None;
+            }
+        });
+    });
 }
 
 fn track(t: &Track) -> Value {
@@ -105,6 +244,30 @@ fn status() -> Value {
     })
 }
 
+fn handle_with(app: &gtk::Application, name: &str, args: Value, reply: Reply) {
+    match name {
+        "music.volume" => {
+            if let Some(level) = args["level"].as_f64() {
+                player::set_volume(level / 100.0);
+            }
+            if let Some(muted) = args["muted"].as_bool() {
+                player::set_muted(muted);
+            }
+            let p = crate::prefs::get();
+            reply(Ok(json!({"volume": (p.volume * 100.0).round(), "muted": p.muted})))
+        }
+        "music.playlists" => {
+            let items: Vec<Value> = store::playlists().into_iter().map(|p| json!({"title": p.name, "id": p.id})).collect();
+            reply(Ok(json!({"items": items})))
+        }
+        "music.open" => {
+            crate::window::present(app, args["section"].as_str());
+            reply(Ok(Value::Null))
+        }
+        _ => handle(name, args, reply),
+    }
+}
+
 pub fn handle(name: &str, args: Value, reply: Reply) {
     match name {
         "music.search" => reply((|| {
@@ -170,6 +333,14 @@ pub fn handle(name: &str, args: Value, reply: Reply) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_description_is_api_2() {
+        let d = nyx_actions::Description::from_value(&description(crate::APP_ID), None).unwrap();
+        assert_eq!(d.app.panel.as_ref().map(|p| p.id.as_str()), Some("music"));
+        assert_eq!(d.action("music.status").unwrap().risk, nyx_actions::Risk::ReadOnly);
+        assert!(!d.action("music.open").unwrap().asks(), "opening the window never asks");
+    }
 
     #[test]
     fn best_match_prefers_exact_then_start() {

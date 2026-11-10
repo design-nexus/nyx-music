@@ -12,9 +12,10 @@ name = "nyx-music"
 path = "src/main.rs"
 
 [dependencies]
-nyx-core = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
-nyx-ui = { git = "https://github.com/design-nexus/nyx-design.git", rev = "40db521bab468d54f18f65c6aabd7fc8533d6a4d" }
-nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "40db521bab468d54f18f65c6aabd7fc8533d6a4d" }
+nyx-core = { git = "https://github.com/design-nexus/nyx-core.git", rev = "3691c994583e89102687861909d533a593da9f9d" }
+nyx-actions = { git = "https://github.com/design-nexus/nyx-core.git", rev = "3691c994583e89102687861909d533a593da9f9d", default-features = false }
+nyx-ui = { git = "https://github.com/design-nexus/nyx-design.git", rev = "99d1ef4d896475bd76f17496d017150d0c24d7e2" }
+nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "99d1ef4d896475bd76f17496d017150d0c24d7e2" }
 anyhow = "1.0.104"
 async-channel = "2"
 gst = { version = "0.25", package = "gstreamer" }
