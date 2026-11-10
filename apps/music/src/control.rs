@@ -39,6 +39,13 @@ pub fn description(app_id: &str) -> Value {
             {"name": "music.volume", "description": "Set Music's volume (0 to 100), or mute and unmute it.",
              "inputSchema": {"type": "object", "properties": {"level": {"type": "number", "minimum": 0, "maximum": 100}, "muted": {"type": "boolean"}}, "additionalProperties": false},
              "annotations": {"title": "Volume"}, "x-nyx": {"risk": "writes", "positional": ["level"], "aliases": ["vol"], "result": "object"}},
+            {"name": "music.outputs", "description": "The audio outputs Music can play through, the one in use marked.",
+             "inputSchema": {"type": "object", "properties": {"prefix": {"type": "string"}, "limit": {"type": "integer", "minimum": 1}}, "additionalProperties": false},
+             "annotations": {"title": "Audio outputs", "readOnlyHint": true}, "x-nyx": {"risk": "read_only", "aliases": ["outputs", "speakers"], "result": "list"}},
+            {"name": "music.output", "description": "Play through an audio output (its name or ID from music.outputs), or default for the system's.",
+             "inputSchema": {"type": "object", "properties": {"output": {"type": "string", "minLength": 1}}, "required": ["output"], "additionalProperties": false},
+             "annotations": {"title": "Choose the output"},
+             "x-nyx": {"risk": "writes", "confirmation": "never", "positional": ["output"], "aliases": ["through"], "suggest": {"output": "music.outputs"}, "result": "message"}},
             {"name": "music.playlists", "description": "The playlists in the music library.",
              "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
              "annotations": {"title": "Playlists"}, "x-nyx": {"risk": "read_only", "result": "list"}},
@@ -114,6 +121,21 @@ fn publish(topic: &str) {
 }
 
 /// What the panel shows: the song, its cover, where it is, and the player's options.
+/// The output in use, by name, as last seen (listing outputs takes a moment).
+fn output_name() -> String {
+    thread_local! {
+        static SEEN: RefCell<(String, String)> = const { RefCell::new((String::new(), String::new())) };
+    }
+    let chosen = crate::prefs::get().output;
+    if let Some(name) = SEEN.with(|s| (s.borrow().0 == chosen && !s.borrow().1.is_empty()).then(|| s.borrow().1.clone())) {
+        return name;
+    }
+    let all = crate::player::engine::outputs();
+    let name = all.iter().find(|o| if chosen.is_empty() { o.default } else { o.id == chosen }).map(|o| o.name.clone()).unwrap_or_default();
+    SEEN.with(|s| *s.borrow_mut() = (chosen, name.clone()));
+    name
+}
+
 fn playback() -> Value {
     let (volume, muted) = {
         let p = crate::prefs::get();
@@ -124,6 +146,7 @@ fn playback() -> Value {
     v["duration"] = json!(player::duration().round());
     v["volume"] = json!((volume * 100.0).round());
     v["muted"] = json!(muted);
+    v["output"] = json!(output_name());
     v["can_next"] = json!(player::can_next());
     v["can_previous"] = json!(player::can_previous());
     v["art"] = json!(player::current()
@@ -255,6 +278,39 @@ fn handle_with(app: &gtk::Application, name: &str, args: Value, reply: Reply) {
             }
             let p = crate::prefs::get();
             reply(Ok(json!({"volume": (p.volume * 100.0).round(), "muted": p.muted})))
+        }
+        "music.outputs" => {
+            let prefix = args["prefix"].as_str().unwrap_or("").to_lowercase();
+            let chosen = crate::prefs::get().output;
+            let items: Vec<Value> = crate::player::engine::outputs()
+                .into_iter()
+                .filter(|o| o.name.to_lowercase().starts_with(&prefix))
+                .map(|o| {
+                    let current = if chosen.is_empty() { o.default } else { o.id == chosen };
+                    json!({"title": o.name, "value": o.name, "id": o.id, "subtitle": if o.default { "System default" } else { "" }, "current": current})
+                })
+                .take(args["limit"].as_u64().unwrap_or(50) as usize)
+                .collect();
+            reply(Ok(json!({"items": items})))
+        }
+        "music.output" => {
+            let wanted = args["output"].as_str().unwrap_or("").trim().to_lowercase();
+            if wanted == "default" {
+                crate::player::set_output("");
+                return reply(Ok(json!({"message": "Music plays through the system's default output"})));
+            }
+            let all = crate::player::engine::outputs();
+            let found = all.iter().find(|o| o.id.to_lowercase() == wanted || o.name.to_lowercase() == wanted).or_else(|| {
+                let starting: Vec<_> = all.iter().filter(|o| o.name.to_lowercase().starts_with(&wanted)).collect();
+                if starting.len() == 1 { Some(starting[0]) } else { None }
+            });
+            match found {
+                Some(o) => {
+                    crate::player::set_output(&o.id);
+                    reply(Ok(json!({"message": format!("Music plays through {}", o.name)})))
+                }
+                None => reply(Err(format!("No single output is called “{wanted}”; music outputs lists them"))),
+            }
         }
         "music.playlists" => {
             let items: Vec<Value> = store::playlists().into_iter().map(|p| json!({"title": p.name, "id": p.id})).collect();

@@ -935,6 +935,26 @@ pub fn clear() {
     queue_changed();
 }
 
+/// Play through output `id` (PipeWire's node name; "" for the system's default) from
+/// now on, carrying on where it was.
+pub fn set_output(id: &str) {
+    prefs::update(|p| p.output = id.to_string());
+    cancel_xfade();
+    with(|p| {
+        p.spare = None;
+        let state = p.state;
+        let Some(engine) = p.engine.as_mut() else { return };
+        let position = engine.position();
+        engine.set_output(id);
+        match state {
+            State::Playing => engine.play(),
+            State::Paused => engine.pause(),
+            _ => return,
+        }
+        p.pending_seek = position;
+    });
+}
+
 pub fn set_volume(v: f64) {
     let v = v.clamp(0.0, 1.0);
     prefs::update(|p| p.volume = v);

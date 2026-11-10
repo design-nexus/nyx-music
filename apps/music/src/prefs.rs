@@ -42,6 +42,8 @@ pub struct Prefs {
     pub spectrum_peaks: bool,
     /// 0..1, cubic (what the slider shows).
     pub volume: f64,
+    /// The audio output, by PipeWire node name; empty for the system's default.
+    pub output: String,
     pub muted: bool,
     pub shuffle: bool,
     /// off, all or one.
@@ -92,6 +94,7 @@ impl Default for Prefs {
             spectrum_density: "medium".into(),
             spectrum_peaks: true,
             volume: 0.8,
+            output: String::new(),
             muted: false,
             shuffle: false,
             repeat: "off".into(),

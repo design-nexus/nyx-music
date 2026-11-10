@@ -51,6 +51,45 @@ pub fn missing() -> Vec<(&'static str, &'static str)> {
     v
 }
 
+/// An audio output: PipeWire's node name (what the settings keep) and what to call it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Output {
+    pub id: String,
+    pub name: String,
+    pub default: bool,
+}
+
+/// The audio outputs there are now.
+pub fn outputs() -> Vec<Output> {
+    if gst::init().is_err() {
+        return Vec::new();
+    }
+    let monitor = gst::DeviceMonitor::new();
+    monitor.add_filter(Some("Audio/Sink"), None);
+    if monitor.start().is_err() {
+        return Vec::new();
+    }
+    let found = monitor
+        .devices()
+        .iter()
+        .filter_map(|d| {
+            let props = d.properties()?;
+            let id = props.get::<String>("node.name").ok()?;
+            Some(Output { id, name: d.display_name().to_string(), default: props.get::<bool>("is-default").unwrap_or(false) })
+        })
+        .collect();
+    monitor.stop();
+    found
+}
+
+/// A sink that plays through output `id` (PipeWire falls back to the default when
+/// it's gone); `None` without PipeWire's GStreamer plugin.
+fn sink_for(id: &str) -> Option<gst::Element> {
+    let sink = gst::ElementFactory::make("pipewiresink").build().ok()?;
+    sink.set_property("target-object", id);
+    Some(sink)
+}
+
 fn make(name: &str) -> Option<gst::Element> {
     gst::ElementFactory::make(name).build().ok()
 }
@@ -68,6 +107,8 @@ impl Engine {
             if sink.has_property("sync") {
                 sink.set_property("sync", true);
             }
+            playbin.set_property("audio-sink", &sink);
+        } else if let Some(sink) = Some(crate::prefs::get().output).filter(|o| !o.is_empty()).and_then(|o| sink_for(&o)) {
             playbin.set_property("audio-sink", &sink);
         }
 
@@ -141,6 +182,15 @@ impl Engine {
 
     pub fn has_eq(&self) -> bool {
         self.eq.is_some()
+    }
+
+    /// Play through output `id` ("" for the system's default). Leaves it stopped
+    /// (Ready): the caller plays again and seeks back.
+    pub fn set_output(&mut self, id: &str) {
+        let _ = self.playbin.set_state(gst::State::Ready);
+        self.frames.clear();
+        let sink = if id.is_empty() { None } else { sink_for(id) };
+        self.playbin.set_property("audio-sink", sink.as_ref());
     }
 
     /// Load a song (stopped first, so it starts from the top).
