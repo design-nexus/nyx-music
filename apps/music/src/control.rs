@@ -30,7 +30,7 @@ pub fn description(app_id: &str) -> Value {
              "annotations": {"title": "Add to the queue"}, "x-nyx": {"risk": "writes", "positional": ["what", "name"], "result": "object"}},
             {"name": "music.status", "description": "What Music is playing: track, artist, album, playing or paused, shuffle, repeat, what's next.",
              "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
-             "annotations": {"title": "Now playing"}, "x-nyx": {"risk": "read_only", "aliases": ["now"], "result": "object"}},
+             "annotations": {"title": "Now playing"}, "x-nyx": {"icon": "audio-x-generic-symbolic", "risk": "read_only", "aliases": ["now"], "result": "object"}},
             {"name": "music.control", "description": "Play, pause, toggle, next, previous or stop in Music; or set shuffle on/off.",
              "inputSchema": {"type": "object", "properties": {"action": {"enum": ["play", "pause", "toggle", "next", "previous", "stop", "shuffle_on", "shuffle_off"]}}, "required": ["action"], "additionalProperties": false},
              "annotations": {"title": "Playback control"},
