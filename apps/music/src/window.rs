@@ -140,11 +140,17 @@ fn build(app: &gtk::Application) {
     let mut counts = HashMap::new();
     let playlist_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let mut last_group = "";
+    let mut headings = 0;
     for s in sections.iter().filter(|s| s.nav) {
         // The library needs no heading: it's what the sidebar starts with.
         if s.group != last_group {
             if !last_group.is_empty() {
-                list.append(&group_heading(s.group));
+                let heading = group_heading(s.group);
+                // The first heading in the app's accent, the others from the theme's [sections.music].
+                let section = if headings == 0 { nyx_ui::sidebar::ACCENT_SECTION.to_string() } else { s.group.to_lowercase() };
+                nyx_ui::sidebar::set_section(&heading, &section);
+                list.append(&heading);
+                headings += 1;
             }
             last_group = s.group;
         }
