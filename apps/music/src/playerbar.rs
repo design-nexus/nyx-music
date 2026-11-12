@@ -246,6 +246,11 @@ pub fn build() -> gtk::Box {
     repeat.add_css_class("flat");
     repeat.add_css_class("icon-button");
     repeat.add_css_class("transport-toggle");
+    // Names for screen readers: GTK reads a tooltip only as the description, and the
+    // repeat toggle's tooltip says its state.
+    shuffle.update_property(&[gtk::accessible::Property::Label("Shuffle")]);
+    play.update_property(&[gtk::accessible::Property::Label("Play")]);
+    repeat.update_property(&[gtk::accessible::Property::Label("Repeat")]);
     for w in [shuffle.upcast_ref::<gtk::Widget>(), prev.upcast_ref(), play.upcast_ref(), next.upcast_ref(), repeat.upcast_ref()] {
         w.set_focus_on_click(false);
         controls.append(w);
@@ -442,6 +447,7 @@ pub fn build() -> gtk::Box {
                 let playing = player::state() == State::Playing;
                 play.set_icon_name(if playing { "media-playback-pause-symbolic" } else { "media-playback-start-symbolic" });
                 play.set_tooltip_text(Some(if playing { "Pause (Space)" } else { "Play (Space)" }));
+                play.update_property(&[gtk::accessible::Property::Label(if playing { "Pause" } else { "Play" })]);
             }
             Event::Position | Event::Seeked => {
                 if dragging.get() != 0 && e == Event::Position {
@@ -482,11 +488,13 @@ pub fn build() -> gtk::Box {
                 syncing.set(false);
                 let p = prefs::get();
                 mute.set_icon_name(volume_icon(p.volume, p.muted));
-                mute.set_tooltip_text(Some(match (window::narrow(), p.muted) {
+                let mute_name = match (window::narrow(), p.muted) {
                     (true, _) => "Volume",
                     (false, true) => "Unmute",
                     (false, false) => "Mute",
-                }));
+                };
+                mute.set_tooltip_text(Some(mute_name));
+                mute.update_property(&[gtk::accessible::Property::Label(mute_name)]);
                 if (volume.value() - p.volume).abs() > 0.005 {
                     volume.set_value(p.volume);
                 }
