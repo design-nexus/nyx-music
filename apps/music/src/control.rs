@@ -158,8 +158,8 @@ fn playback() -> Value {
     v
 }
 
-/// The window, held while it plays: a headless Music (started for a call) quits when
-/// it's idle, not halfway through a song.
+/// A headless Music (started for a call) is held while it plays, so it quits when it's
+/// idle, not halfway through a song.
 pub fn hold_while_playing(app: &gtk::Application) {
     thread_local! {
         static HOLD: RefCell<Option<gtk::gio::ApplicationHoldGuard>> = const { RefCell::new(None) };

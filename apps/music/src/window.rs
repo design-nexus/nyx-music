@@ -121,6 +121,12 @@ fn build(app: &gtk::Application) {
     window.set_titlebar(Some(&gtk::Box::new(gtk::Orientation::Horizontal, 0)));
     nyx_ui::keys::install(&window, nyx_ui::keys::Common { settings: Some(settings_dialog::open), ..Default::default() });
     window.set_icon_name(Some("io.github.design_nexus.nyx.Music"));
+    // Closing Music stops the music, even when a call started it in the background first.
+    let a = app.clone();
+    window.connect_close_request(move |_| {
+        a.quit();
+        glib::Propagation::Stop
+    });
 
     let sections = sections::all();
 

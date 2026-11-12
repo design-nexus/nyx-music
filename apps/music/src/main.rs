@@ -133,8 +133,10 @@ fn main() -> glib::ExitCode {
     // (primary instance only).
     app.connect_startup(move |app| {
         control::serve(app);
-        control::hold_while_playing(app);
         if service {
+            // Only a headless Music (started for a call) stays up while it plays; one
+            // with a window quits when the window closes.
+            control::hold_while_playing(app);
             start(app);
             app.set_inactivity_timeout(10_000);
         }
