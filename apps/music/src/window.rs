@@ -192,16 +192,7 @@ fn build(app: &gtk::Application) {
     stack.set_transition_duration(if prefs::get().reduce_motion { 0 } else { 160 });
 
     let search = search_entry();
-    // The pages, over the player bar.
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    content.set_hexpand(true);
-    content.append(&stack);
-    content.append(&playerbar::build());
-
-    let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    body.set_vexpand(true);
-    body.append(&nav);
-    body.append(&content);
+    let bar = playerbar::build();
 
     // The header: the app and the page, search, the equalizer, the mini player, Settings.
     let header = chrome::app_header(&window, "music-note-symbolic", "Music");
@@ -214,10 +205,13 @@ fn build(app: &gtk::Application) {
     header.end.append(&mini);
     header.end.append(&chrome::settings_button(settings_dialog::open));
 
-    let frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    frame.add_css_class("window-frame");
-    frame.append(&header.root);
-    // The body's minimum width doesn't hold the window open: a tiled window gets
+    // The player bar runs across the window's foot, under the sidebar and the pages.
+    let frame = nyx_ui::frame::AppFrame::new(&header.root);
+    frame.set_sidebar(&nav);
+    frame.set_page(&stack);
+    frame.set_foot(&bar);
+    let body = frame.body.clone();
+    // The frame's minimum width doesn't hold the window open: a tiled window gets
     // the compositor's width even while the wide layout is wider, and goes narrow.
     let body_scroll = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::External)
@@ -225,12 +219,11 @@ fn build(app: &gtk::Application) {
         .propagate_natural_width(true)
         .propagate_natural_height(true)
         .vexpand(true)
-        .child(&body)
+        .child(&frame.root)
         .build();
-    frame.append(&body_scroll);
 
     let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&frame));
+    overlay.set_child(Some(&body_scroll));
     window.set_child(Some(&overlay));
 
     install_keys(&window, &search);
@@ -239,11 +232,12 @@ fn build(app: &gtk::Application) {
     // or whenever the wide layout needs more than the window has.
     let wide_min = Rc::new(std::cell::Cell::new(0));
     let apply_width = {
-        let (nav, body) = (nav.clone(), body.clone());
+        let (nav, body, bar) = (nav.clone(), body.clone(), bar.clone());
         move |w: &gtk::ApplicationWindow| {
             let width = if w.width() > 0 { w.width() } else { w.default_width() };
             if !NARROW.with(|n| n.get()) {
-                wide_min.set(body.measure(gtk::Orientation::Horizontal, -1).0);
+                let min = |w: &gtk::Box| w.measure(gtk::Orientation::Horizontal, -1).0;
+                wide_min.set(min(&body).max(min(&bar)));
             }
             let narrow = width > 0 && (width < 980 || width < wide_min.get());
             settings_dialog::fit(w);
