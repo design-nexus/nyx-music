@@ -2,10 +2,13 @@
 
 - GTK4 (gtk4-rs 0.11) + Rust + GStreamer (gstreamer-rs 0.25). No libadwaita. The
   window is Nyx 2.0's one blended surface (see `STYLE.md`): the `nyx_ui::chrome::app_header`
-  (the app and the page, library search in the middle, equalizer, mini player and
-  settings at the end), the sidebar (the library with counts, Online, Playlists with its
-  +, the library's size at its foot) and beside it the pages over the player card. No
-  status bar. Albums has a page head with a segmented sort; Now playing is two columns
+  (the app and the sidebar's toggle, library search in the middle, mini player and
+  settings at the end), the sidebar (Home and Now playing, then Library, Online and
+  Playlists headings in their section colours with a bar each on the icon rail; Up next
+  heads Playlists; the library's size at its foot) and beside it the pages over the
+  player bar (Lyrics, Up next, the equalizer, sleep and volume at its right). No
+  status bar. Home (`sections/home.rs`) opens the app; Podcasts is the row of your
+  shows over the chosen one, with Find a podcast for the directory. Albums has a page head with a segmented sort; Now playing is two columns
   (cover and song; spectrum or lyrics and up next) over the blurred cover.
   Settings is a card over the window (`settings_dialog.rs`): it builds the settings
   page once and lists its groups (named by `Page::group`) on the left; `navigate("settings")`

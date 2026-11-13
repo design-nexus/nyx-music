@@ -3,26 +3,16 @@
   padding: 0;
 }
 
-.settings-navigation button.nav-item {
-  min-height: 42px;
-  padding: 0 12px;
-  margin: 1px 0;
-  border-radius: 6px;
+window.music-window .settings-navigation button.nav-item {
   border: none;
-  background: transparent;
-  box-shadow: none;
-  color: @theme_text;
-  font-weight: 500;
-  transition: background 150ms ease-out, color 150ms ease-out;
 }
 
-.settings-navigation button.nav-item:hover {
-  background: @row_hover;
-}
-
-.settings-navigation button.nav-item.active {
-  background: @nav_active;
-  box-shadow: none;
+/* The icon rail's mark where a group starts: a short bar in its colour. */
+.settings-navigation separator.nav-divider {
+  margin: 8px 14px 6px;
+  min-height: 2px;
+  border-radius: 1px;
+  background: @theme_divider;
 }
 
 /* ---------- Search ---------- */
@@ -60,18 +50,18 @@ window.music-window button:active {
 }
 
 window.music-window button.suggested-action {
-  background: @nav_active;
+  background: @theme_accent;
   border-color: transparent;
-  color: @theme_text;
+  color: @theme_on_accent;
   font-weight: 600;
 }
 
-window.music-window button.suggested-action image {
-  color: @theme_accent;
+window.music-window button.suggested-action:hover {
+  background: mix(@theme_accent, @theme_text, 0.12);
 }
 
-window.music-window button.suggested-action:hover {
-  background: mix(@theme_bg, @theme_accent, 0.26);
+window.music-window button.suggested-action:disabled {
+  opacity: 0.5;
 }
 
 window.music-window button.destructive-action {
@@ -925,6 +915,25 @@ window.music-window .settings-navigation button.nav-group-add {
   margin: 0;
 }
 
+/* The bar's padding is its row's, so the narrow progress line runs edge to edge. */
+.player-bar {
+  padding: 0;
+}
+
+.player-row {
+  padding: 10px 14px;
+}
+
+.app-frame > .player-bar .player-row {
+  padding: 8px 16px 12px 14px;
+}
+
+window.music-window progressbar.player-line > trough,
+window.music-window progressbar.player-line > trough > progress {
+  min-height: 3px;
+  border-radius: 0;
+}
+
 .player-title {
   font-weight: 500;
 }
@@ -941,8 +950,10 @@ window.music-window label.time-readout.mono {
   font-feature-settings: "tnum";
 }
 
-window.music-window button.transport-toggle:checked {
-  background: transparent;
+window.music-window button.transport-toggle:checked,
+window.music-window button.icon-button:checked {
+  background: @nav_active;
+  color: @theme_accent;
 }
 
 /* Play: a light round button with the glyph in the background colour. */
@@ -1033,3 +1044,277 @@ window.music-window label.mono {
   font-feature-settings: "tnum";
 }
 
+
+/* ---------- Home ---------- */
+
+.settings-page.home {
+  padding: 20px 24px 24px;
+}
+
+.settings-page.home.narrow {
+  padding: 16px 18px 20px;
+}
+
+.home-head {
+  min-height: 24px;
+  margin-bottom: 10px;
+}
+
+.home-title {
+  font-weight: 600;
+}
+
+window.music-window button.home-more {
+  min-height: 22px;
+  padding: 0 4px;
+  margin: 0 -4px 0 0;
+  font-size: 0.923em;
+  font-weight: 500;
+}
+
+.home-two {
+  margin: 22px 0;
+}
+
+.jump-card .cover {
+  border-radius: 8px;
+}
+
+.jump-card.hover .cover {
+  box-shadow: 0 0 0 1px alpha(@theme_text, 0.22);
+}
+
+.jump-card.hover button.card-play {
+  opacity: 1;
+}
+
+.home-card {
+  padding: 4px 0;
+  box-shadow: inset 0 0 0 1px @hairline;
+}
+
+.home-row {
+  padding: 8px 12px;
+}
+
+.home-kicker {
+  color: @theme_accent;
+  font-size: 0.846em;
+  font-weight: 600;
+}
+
+.home-row-title {
+  font-weight: 500;
+}
+
+window.music-window .home-meta,
+window.music-window .home-meta label {
+  font-size: 0.846em;
+  color: @theme_text_tertiary;
+}
+
+window.music-window .home-meta .home-meta {
+  font-size: 1em;
+}
+
+window.music-window .downloaded,
+window.music-window .downloaded label {
+  color: @theme_success;
+}
+
+window.music-window label.on-air {
+  color: @theme_danger;
+  font-weight: 700;
+  font-size: 0.78em;
+  letter-spacing: 0.05em;
+}
+
+window.music-window button.home-play {
+  color: @theme_accent;
+}
+
+.cover.round {
+  border-radius: 999px;
+}
+
+.home-note {
+  padding: 14px 16px;
+}
+
+.top-grid > flowboxchild {
+  padding: 0;
+}
+
+window.music-window button.top-row {
+  min-height: 0;
+  padding: 6px 4px;
+  border: none;
+  background: transparent;
+}
+
+window.music-window button.top-row:hover {
+  background: @row_hover;
+}
+
+window.music-window button.top-row label {
+  font-weight: 400;
+}
+
+window.music-window button.top-row label.home-row-title {
+  font-weight: 500;
+}
+
+window.music-window progressbar.episode-progress > trough {
+  min-width: 0;
+}
+
+/* A secondary action that still reads as a button: an outline, no fill. */
+window.music-window button.outlined {
+  background: transparent;
+  border: 1px solid alpha(@theme_text, 0.16);
+}
+
+window.music-window button.outlined:hover {
+  background: @row_hover;
+}
+
+.settings-navigation .nav-readout.badge {
+  padding: 1px 6px;
+}
+
+.top-rank {
+  color: @theme_text_tertiary;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+
+/* ---------- Podcasts: your shows ---------- */
+
+.show-strip {
+  padding: 8px 12px 10px;
+}
+
+.show-strip-scroll {
+  border-bottom: 1px solid @hairline;
+}
+
+window.music-window button.show-tile {
+  min-width: 84px;
+  padding: 6px;
+  border: none;
+  border-radius: var(--nyx-radius-card);
+  background: transparent;
+}
+
+window.music-window button.show-tile:hover {
+  background: @row_hover;
+}
+
+window.music-window button.show-tile.selected {
+  background: @nav_active;
+}
+
+.show-name {
+  font-size: 0.846em;
+  color: @theme_dim_text;
+}
+
+.show-tile.selected .show-name {
+  color: @theme_text;
+  font-weight: 500;
+}
+
+.show-new {
+  margin: -4px -6px 0 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: @theme_accent;
+  color: @theme_on_accent;
+  font-size: 0.7em;
+  font-weight: 700;
+}
+
+.podcast-detail {
+  padding: 18px 22px;
+}
+
+.show-head {
+  margin-bottom: 18px;
+}
+
+.show-title {
+  font-size: 1.385em;
+  font-weight: 600;
+}
+
+.show-author {
+  color: @theme_accent;
+  font-size: 0.923em;
+  font-weight: 500;
+}
+
+.show-head .podcast-about {
+  margin: 4px 0 0;
+}
+
+.show-actions {
+  margin-top: 8px;
+}
+
+window.music-window listview.episode-list {
+  background: transparent;
+}
+
+window.music-window listview.episode-list > row {
+  padding: 10px 4px;
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid @hairline;
+}
+
+.episode-date {
+  font-size: 0.846em;
+  color: @theme_text_tertiary;
+}
+
+.episode-new {
+  font-size: 0.846em;
+  font-weight: 700;
+  color: @theme_accent;
+}
+
+.episode-title {
+  font-weight: 600;
+}
+
+window.music-window .episode-meta,
+window.music-window .episode-meta label {
+  font-size: 0.846em;
+  color: @theme_dim_text;
+}
+
+window.music-window .episode-meta .downloaded,
+window.music-window .episode-meta .downloaded label {
+  color: @theme_dim_text;
+}
+
+window.music-window .episode-meta .downloaded image {
+  color: @theme_success;
+}
+
+.episode-row.played {
+  opacity: 0.55;
+}
+
+window.music-window button.episode-play {
+  min-width: 34px;
+  min-height: 34px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: alpha(@theme_accent, 0.16);
+  color: @theme_accent;
+}
+
+window.music-window button.episode-play:hover {
+  background: alpha(@theme_accent, 0.26);
+}

@@ -1,24 +1,56 @@
-//! The bar under every page: what's playing, transport, seek, volume and a
-//! small spectrum strip.
+//! The bar under every page: what's playing, transport and seek, then Lyrics,
+//! Up next, the equalizer, the sleep timer and volume.
 
 use crate::library::art::Cover;
 use crate::player::{self, Event, State, queue::Repeat};
-use crate::{fmt, prefs, spectrum, widgets, window};
+use crate::{fmt, prefs, widgets, window};
 use gtk::glib;
 use gtk::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 thread_local! {
-    static NARROW_PARTS: RefCell<Vec<gtk::Widget>> = const { RefCell::new(Vec::new()) };
+    /// What a narrow window hides, and what it shows instead (`true`).
+    static NARROW_PARTS: RefCell<Vec<(gtk::Widget, bool)>> = const { RefCell::new(Vec::new()) };
 }
 
 pub fn set_narrow(narrow: bool) {
     NARROW_PARTS.with(|p| {
-        for w in p.borrow().iter() {
-            w.set_visible(!narrow);
+        for (w, narrow_only) in p.borrow().iter() {
+            w.set_visible(narrow == *narrow_only);
         }
     });
+}
+
+/// A toggle at the bar's right end that opens a page, lit while it shows.
+fn page_toggle(icon: &str, name: &str, tooltip: &str, lit: fn(&str) -> bool, run: fn()) -> gtk::ToggleButton {
+    let b = gtk::ToggleButton::new();
+    b.set_icon_name(icon);
+    b.add_css_class("flat");
+    b.add_css_class("icon-button");
+    b.set_tooltip_text(Some(tooltip));
+    b.update_property(&[gtk::accessible::Property::Label(name)]);
+    b.set_focus_on_click(false);
+    let syncing = Rc::new(Cell::new(false));
+    let s = syncing.clone();
+    b.connect_toggled(move |_| {
+        if !s.get() {
+            run();
+        }
+    });
+    let sync = {
+        let b = b.downgrade();
+        move |page: &str| {
+            if let Some(b) = b.upgrade() {
+                syncing.set(true);
+                b.set_active(lit(page));
+                syncing.set(false);
+            }
+        }
+    };
+    sync(&window::current());
+    window::on_page(&b, sync);
+    b
 }
 
 fn volume_icon(v: f64, muted: bool) -> &'static str {
@@ -33,9 +65,9 @@ fn volume_icon(v: f64, muted: bool) -> &'static str {
     }
 }
 
-/// "Artist — Album", leaving out what's empty.
+/// "Artist · Album", leaving out what's empty.
 pub fn byline(t: &crate::library::Track) -> String {
-    [t.artist.as_str(), t.album.as_str()].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join(" — ")
+    [t.artist.as_str(), t.album.as_str()].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join(" · ")
 }
 
 /// The glyph a cover shows when there's no picture.
@@ -194,8 +226,16 @@ fn now_playing_tooltip(w: &impl IsA<gtk::Widget>) {
 }
 
 pub fn build() -> gtk::Box {
+    let outer = widgets::vbox(0);
+    outer.add_css_class("player-bar");
     let bar = widgets::hbox(16);
-    bar.add_css_class("player-bar");
+    bar.add_css_class("player-row");
+    outer.append(&bar);
+    // Narrow, the seek row gives way to a thin line along the bar's foot.
+    let line = gtk::ProgressBar::new();
+    line.add_css_class("player-line");
+    line.set_visible(false);
+    outer.append(&line);
 
     // ----- Now playing -----
     let info = widgets::hbox(12);
@@ -276,19 +316,22 @@ pub fn build() -> gtk::Box {
     center.append(&seek_row);
     bar.append(&center);
 
-    // ----- Spectrum strip + volume -----
-    let right = widgets::hbox(8);
+    // ----- Lyrics, Up next, the equalizer, sleep and volume -----
+    let right = widgets::hbox(2);
     right.set_valign(gtk::Align::Center);
     right.set_halign(gtk::Align::End);
-    let strip = spectrum::analyzer(true);
-    strip.set_size_request(110, 34);
-    strip.set_hexpand(false);
-    strip.set_valign(gtk::Align::Center);
-    now_playing_tooltip(&strip);
-    let sclick = gtk::GestureClick::new();
-    sclick.connect_released(|_, _, _, _| window::toggle_now_playing());
-    strip.add_controller(sclick);
-    right.append(&strip);
+    right.append(&page_toggle(
+        "format-justify-left-symbolic",
+        "Lyrics",
+        "Lyrics",
+        |page| page == "now-playing" && prefs::get().now_view == "lyrics",
+        window::toggle_lyrics,
+    ));
+    right.append(&page_toggle("music-queue-symbolic", "Up next", "Up next", |page| page == "queue", window::toggle_queue));
+    let eq = widgets::icon_button("music-equalizer-symbolic", "Equalizer");
+    eq.set_focus_on_click(false);
+    eq.connect_clicked(|_| window::open_equalizer());
+    right.append(&eq);
     let sleep = sleep_button();
     right.append(&sleep);
     let p = prefs::get();
@@ -302,13 +345,19 @@ pub fn build() -> gtk::Box {
     volume.add_css_class("volume");
     volume.set_focus_on_click(false);
     volume.set_tooltip_text(Some(&format!("{}%", (p.volume * 100.0).round())));
+    volume.set_margin_start(6);
     right.append(&volume);
     bar.append(&right);
     NARROW_PARTS.with(|n| {
         let mut n = n.borrow_mut();
-        n.push(strip.clone().upcast());
-        n.push(volume.clone().upcast());
+        n.push((volume.clone().upcast(), false));
+        n.push((seek_row.clone().upcast(), false));
+        n.push((line.clone().upcast(), true));
     });
+    let narrow = window::narrow();
+    volume.set_visible(!narrow);
+    seek_row.set_visible(!narrow);
+    line.set_visible(narrow);
 
     // ----- Wiring -----
     play.connect_clicked(|_| player::toggle());
@@ -408,7 +457,7 @@ pub fn build() -> gtk::Box {
             prev.clone(),
             next.clone(),
         );
-        let dragging = dragging.clone();
+        let (dragging, line) = (dragging.clone(), line.clone());
         move |e: Event| match e {
             Event::Track => {
                 match player::current() {
@@ -432,6 +481,7 @@ pub fn build() -> gtk::Box {
                 if live {
                     seek.set_value(0.0);
                 }
+                line.set_visible(window::narrow() && !live);
                 dur.set_text(&if live { "LIVE".to_string() } else { fmt::time(d) });
                 prev.set_sensitive(player::can_previous());
                 next.set_sensitive(player::can_next());
@@ -465,6 +515,7 @@ pub fn build() -> gtk::Box {
                 let p = player::position();
                 seek.set_value(p);
                 pos.set_text(&fmt::time(p));
+                line.set_fraction(if d > 0.0 { (p / d).clamp(0.0, 1.0) } else { 0.0 });
             }
             Event::Queue => {
                 prev.set_sensitive(player::can_previous());
@@ -505,5 +556,5 @@ pub fn build() -> gtk::Box {
         refresh(e);
     }
     player::subscribe(&bar, refresh);
-    bar
+    outer
 }

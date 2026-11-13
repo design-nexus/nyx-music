@@ -59,7 +59,10 @@ pub struct Prefs {
     /// How favourite stations are grouped: genre or country.
     pub radio_group: String,
     pub radio_tab: String,
+    /// The tab Find a podcast opens on.
     pub podcast_tab: String,
+    /// The list Recent and most played shows.
+    pub recent_tab: String,
     /// Check subscribed podcasts for new episodes when Music opens.
     pub podcast_refresh: bool,
     /// Now playing shows the spectrum or the lyrics.
@@ -82,7 +85,7 @@ impl Default for Prefs {
             reduce_motion: false,
             sidebar_collapsed: false,
             glow: true,
-            last_section: "albums".into(),
+            last_section: "home".into(),
             library_folders: vec![paths::music_dir().to_string_lossy().into_owned()],
             watch: true,
             gapless: true,
@@ -106,7 +109,8 @@ impl Default for Prefs {
             radio_country: String::new(),
             radio_group: "genre".into(),
             radio_tab: "favourites".into(),
-            podcast_tab: "subscribed".into(),
+            podcast_tab: "top".into(),
+            recent_tab: "recently-played".into(),
             podcast_refresh: true,
             now_view: "spectrum".into(),
             cover_colours: false,

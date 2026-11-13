@@ -33,9 +33,10 @@ const USAGE: &str = "Usage: nyx-music [OPTIONS] [FILES…]\n\
 \n\
   FILES…          play these songs, folders or .m3u playlists, or stream addresses\n\
   --enqueue       add FILES to the queue instead of playing them now\n\
-  --section ID    open (or switch the open window) to a page: now-playing, songs, albums,\n\
-                  artists, genres, folders, recently-added, recently-played, most-played,\n\
-                  radio, podcasts, queue, equalizer, settings\n\
+  --section ID    open (or switch the open window) to a page: home, now-playing, songs,\n\
+                  albums, artists, genres, folders, recent (or one of its lists:\n\
+                  recently-added, recently-played, most-played), radio, podcasts, queue,\n\
+                  equalizer, settings\n\
   --toggle        close the window if it's open, otherwise open it (for a keybinding)\n\
   --mini          open or close the mini player\n\
   --play-pause, --play, --pause, --stop, --next, --previous\n\

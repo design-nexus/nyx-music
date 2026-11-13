@@ -1,6 +1,6 @@
-//! The main window: the Nyx header (the app and the page, search, the equalizer,
-//! the mini player and settings), the navigation sidebar with the library's size
-//! at its foot, and beside it a stack of pages built the first time they're shown
+//! The main window: the Nyx header (the app and the sidebar's toggle, search, the
+//! mini player and settings), the navigation sidebar with the library's size at
+//! its foot, and beside it a stack of pages built the first time they're shown
 //! over the player bar.
 
 use crate::library::store;
@@ -19,8 +19,8 @@ struct Ui {
     stack: gtk::Stack,
     nav: gtk::Box,
     nav_items: HashMap<String, gtk::Button>,
-    /// The header's subtitle: the page you're on.
-    subtitle: gtk::Label,
+    /// The app's name in the header; the icon alone says it in a narrow window.
+    app_title: Option<gtk::Widget>,
     playlist_box: gtk::Box,
     search: gtk::SearchEntry,
     /// The current page's name, in the top bar.
@@ -57,7 +57,7 @@ pub fn present(app: &gtk::Application, section: Option<&str>) {
     theme::install();
     install_icons();
     build(app);
-    let start = section.map(String::from).unwrap_or_else(|| nyx_theme::start_page("now-playing", &prefs::get().last_section));
+    let start = section.map(String::from).unwrap_or_else(|| nyx_theme::start_page("home", &prefs::get().last_section));
     navigate(&start);
     // Developer aid: MUSIC_SNAPSHOT=/path.png renders the window to a PNG
     // (invisibly) and quits, so layouts can be checked without a visible window.
@@ -99,18 +99,29 @@ fn install_icons() {
     }
 }
 
-fn nav_button(icon: &str, title: &str, tooltip: &str) -> (gtk::Button, gtk::Label) {
-    let button = gtk::Button::new();
-    button.add_css_class("nav-item");
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    content.append(&gtk::Image::from_icon_name(icon));
-    let l = widgets::label(title, "nav-label");
-    l.set_hexpand(true);
-    l.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    content.append(&l);
-    button.set_child(Some(&content));
-    button.set_tooltip_text(Some(tooltip));
-    (button, l)
+/// Where a group starts in the icon rail: a short bar in its colour.
+fn rail_divider(section: &str) -> gtk::Separator {
+    let bar = gtk::Separator::new(gtk::Orientation::Horizontal);
+    bar.add_css_class("nav-divider");
+    bar.add_css_class("compact-show");
+    bar.add_css_class(&format!("section-{section}"));
+    bar.set_visible(false);
+    bar
+}
+
+/// A sidebar group's heading in its section's colour (Library the app's accent,
+/// the others from the theme's `[sections.music]`); Playlists has its + for a new one.
+fn group_heading(group: &str) -> (gtk::Separator, gtk::Box) {
+    let section = if group == "Library" { nyx_ui::sidebar::ACCENT_SECTION.to_string() } else { group.to_lowercase() };
+    let heading = if group == "Playlists" {
+        nyx_ui::sidebar::group_label_with_add(group, false, "New playlist, or import one", || {
+            sections::playlist::new_dialog(Vec::new())
+        })
+    } else {
+        nyx_ui::sidebar::group_label(group, false)
+    };
+    nyx_ui::sidebar::set_section(&heading, &section);
+    (rail_divider(&section), heading)
 }
 
 fn build(app: &gtk::Application) {
@@ -140,44 +151,41 @@ fn build(app: &gtk::Application) {
     let mut counts = HashMap::new();
     let playlist_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let mut last_group = "";
-    let mut headings = 0;
     for s in sections.iter().filter(|s| s.nav) {
-        // The library needs no heading: it's what the sidebar starts with.
+        // Home and Now playing need no heading: they're what the sidebar starts with.
         if s.group != last_group {
-            if !last_group.is_empty() {
-                let heading = group_heading(s.group);
-                // The first heading in the app's accent, the others from the theme's [sections.music].
-                let section = if headings == 0 { nyx_ui::sidebar::ACCENT_SECTION.to_string() } else { s.group.to_lowercase() };
-                nyx_ui::sidebar::set_section(&heading, &section);
+            if !s.group.is_empty() {
+                let (divider, heading) = group_heading(s.group);
+                list.append(&divider);
                 list.append(&heading);
-                headings += 1;
             }
             last_group = s.group;
         }
-        let (button, label) = nav_button(s.icon, s.title, s.description);
-        label.add_css_class("compact-hide");
-        if COUNTED.contains(&s.id)
-            && let Some(content) = button.child().and_downcast::<gtk::Box>()
-        {
-            let count = widgets::label("", "nav-readout");
-            count.add_css_class("compact-hide");
-            content.append(&count);
-            counts.insert(s.id, count);
-        }
+        let item = nyx_ui::sidebar::nav_item(s.icon, s.title, s.description);
         let id = s.id;
-        button.connect_clicked(move |_| navigate(id));
-        list.append(&button);
-        nav_items.insert(s.id.to_string(), button);
+        item.button.connect_clicked(move |_| navigate(id));
+        list.append(&item.button);
+        nav_items.insert(s.id.to_string(), item.button.clone());
+        if COUNTED.contains(&s.id) {
+            counts.insert(s.id, item);
+        }
         if s.id == "queue" {
             list.append(&playlist_box);
         }
     }
+    let counts = Rc::new(counts);
     refresh_counts(&counts);
     {
         let c = counts.clone();
         store::subscribe(&list, move |_| refresh_counts(&c));
         let c = counts.clone();
         crate::online::subscribe(&list, move |_| refresh_counts(&c));
+        let c = counts.clone();
+        player::subscribe(&list, move |e| {
+            if e == player::Event::Queue {
+                refresh_counts(&c);
+            }
+        });
     }
     let nav_scroll = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
@@ -200,12 +208,12 @@ fn build(app: &gtk::Application) {
     let search = search_entry();
     let bar = playerbar::build();
 
-    // The header: the app and the page, search, the equalizer, the mini player, Settings.
+    // The header: the app and the sidebar's toggle, search, the mini player, Settings.
     let header = chrome::app_header(&window, "music-note-symbolic", "Music");
+    let collapse = nyx_ui::widgets::bar_button("sidebar-show-symbolic", "Collapse the sidebar (Ctrl+B)");
+    collapse.connect_clicked(|_| toggle_sidebar());
+    header.start.append(&collapse);
     header.center.append(&search);
-    let eq = nyx_ui::widgets::bar_button("music-equalizer-symbolic", "Equalizer");
-    eq.connect_clicked(|_| open_equalizer());
-    header.end.append(&eq);
     let mini = nyx_ui::widgets::bar_button("view-restore-symbolic", "Mini player (Ctrl+M)");
     mini.connect_clicked(|_| toggle_mini_player());
     header.end.append(&mini);
@@ -288,7 +296,7 @@ fn build(app: &gtk::Application) {
         stack,
         nav,
         nav_items,
-        subtitle: header.subtitle.clone(),
+        app_title: find_class(header.root.upcast_ref(), "app-title"),
         playlist_box: playlist_box.clone(),
         search,
         pages: HashMap::new(),
@@ -308,10 +316,27 @@ fn build(app: &gtk::Application) {
     refresh_playlists();
 }
 
+fn find_class(w: &gtk::Widget, class: &str) -> Option<gtk::Widget> {
+    if w.has_css_class(class) {
+        return Some(w.clone());
+    }
+    let mut child = w.first_child();
+    while let Some(c) = child {
+        if let Some(found) = find_class(&c, class) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
+}
+
+const SEARCH_HINT: &str = "Search songs, albums and artists  (Ctrl+F)";
+const SEARCH_HINT_NARROW: &str = "Search music";
+
 /// The library search, in the middle of the header.
 fn search_entry() -> gtk::SearchEntry {
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Search songs, albums, artists  (Ctrl+F)"));
+    search.set_placeholder_text(Some(SEARCH_HINT));
     search.update_property(&[gtk::accessible::Property::Label("Search the library")]);
     search.add_css_class("bar-search");
     search.set_width_chars(40);
@@ -321,44 +346,45 @@ fn search_entry() -> gtk::SearchEntry {
     search
 }
 
-/// Sections whose sidebar row shows how many things they hold.
-const COUNTED: &[&str] = &["songs", "albums", "artists", "genres", "radio", "podcasts"];
+/// Sections whose sidebar row shows how many things they hold (Podcasts: its new episodes).
+const COUNTED: &[&str] = &["songs", "albums", "artists", "genres", "radio", "podcasts", "queue"];
 
-fn refresh_counts(counts: &HashMap<&'static str, gtk::Label>) {
+fn refresh_counts(counts: &HashMap<&'static str, nyx_ui::sidebar::NavItem>) {
     let loaded = store::loaded();
-    for (id, label) in counts {
+    for (id, item) in counts {
         let n = match *id {
             "songs" if loaded => store::tracks().len(),
             "albums" if loaded => store::albums().len(),
             "artists" if loaded => store::artists().len(),
             "genres" if loaded => store::genres().len(),
             "radio" => crate::online::favourites().len(),
-            "podcasts" => crate::online::podcasts().len(),
+            "podcasts" => crate::online::new_total(),
+            "queue" => player::queue_items().0.len(),
             _ => 0,
         };
-        label.set_text(&if n == 0 { String::new() } else { fmt::thousands(n) });
+        if *id == "podcasts" {
+            item.set_badge(Some(n as u64));
+        } else {
+            item.set_count(Some(n as u64));
+        }
+        set_readout_text(&item.button, n);
     }
 }
 
-/// A sidebar group's heading (Online, Playlists); Playlists has its + for a new one.
-fn group_heading(group: &str) -> gtk::Widget {
-    let heading = widgets::label(&group.to_uppercase(), "nav-group");
-    heading.add_css_class("compact-hide");
-    if group != "Playlists" {
-        return heading.upcast();
+/// The readout in thousands (1,284), as the rest of the app writes counts.
+fn set_readout_text(button: &gtk::Button, n: usize) {
+    let Some(content) = button.child() else { return };
+    let mut child = content.first_child();
+    while let Some(c) = child {
+        if c.has_css_class("nav-readout")
+            && let Some(l) = c.downcast_ref::<gtk::Label>()
+        {
+            l.set_text(&if n > 0 { fmt::thousands(n) } else { String::new() });
+            // A badge is a pill around its number, not a band the row's height.
+            l.set_valign(gtk::Align::Center);
+        }
+        child = c.next_sibling();
     }
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    row.add_css_class("compact-hide");
-    heading.set_hexpand(true);
-    heading.set_xalign(0.0);
-    row.append(&heading);
-    let add = widgets::icon_button("list-add-symbolic", "New playlist, or import one");
-    add.add_css_class("flat");
-    add.add_css_class("nav-group-add");
-    add.set_valign(gtk::Align::Center);
-    add.connect_clicked(|_| sections::playlist::new_dialog(Vec::new()));
-    row.append(&add);
-    row.upcast()
 }
 
 /// The sidebar's foot: how big the library is, and a scan while one runs.
@@ -414,16 +440,23 @@ pub fn toggle_sidebar() {
 fn set_compact_hidden(root: &gtk::Box, compact: bool) {
     fn walk(w: &gtk::Widget, compact: bool) {
         if w.has_css_class("compact-hide") {
-            w.set_visible(!compact);
+            // An empty count stays hidden when the labels come back.
+            let empty = w.has_css_class("nav-readout") && w.downcast_ref::<gtk::Label>().is_some_and(|l| l.text().is_empty());
+            w.set_visible(!compact && !empty);
         }
         if w.has_css_class("compact-show") {
             w.set_visible(compact);
         }
         // Icon-only: centre the icon in its pill, and the toggle in the column.
-        if w.has_css_class("nav-item")
-            && let Some(content) = w.downcast_ref::<gtk::Button>().and_then(|b| b.child())
-        {
-            content.set_halign(if compact { gtk::Align::Center } else { gtk::Align::Fill });
+        if w.has_css_class("nav-item") {
+            if compact {
+                w.add_css_class("compact");
+            } else {
+                w.remove_css_class("compact");
+            }
+            if let Some(content) = w.downcast_ref::<gtk::Button>().and_then(|b| b.child()) {
+                content.set_halign(if compact { gtk::Align::Center } else { gtk::Align::Fill });
+            }
         }
         let mut child = w.first_child();
         while let Some(c) = child {
@@ -654,7 +687,28 @@ pub fn toggle_now_playing() {
         return;
     }
     let prev = ui().and_then(|u| u.borrow_mut().history.pop());
-    go(prev.as_deref().unwrap_or("albums"), false);
+    go(prev.as_deref().unwrap_or("home"), false);
+}
+
+/// The player bar's Lyrics: Now playing with its lyrics showing, or back from them.
+pub fn toggle_lyrics() {
+    if current() == "now-playing" && prefs::get().now_view == "lyrics" {
+        toggle_now_playing();
+        return;
+    }
+    sections::now_playing::show_lyrics();
+    navigate("now-playing");
+    page_changed("now-playing");
+}
+
+/// The player bar's Up next: the queue, or back from it.
+pub fn toggle_queue() {
+    if current() == "queue" {
+        let prev = ui().and_then(|u| u.borrow_mut().history.pop());
+        go(prev.as_deref().unwrap_or("home"), false);
+    } else {
+        navigate("queue");
+    }
 }
 
 fn visible_back_button(w: &gtk::Widget) -> Option<gtk::Button> {
@@ -680,7 +734,7 @@ fn on_search(text: &str) {
     if q.is_empty() {
         let back = std::mem::take(&mut ui.borrow_mut().before_search);
         if ui.borrow().current == "search" {
-            navigate(if back.is_empty() { "albums" } else { &back });
+            navigate(if back.is_empty() { "home" } else { &back });
         }
         return;
     }
@@ -697,7 +751,13 @@ fn set_narrow(narrow: bool) {
     playerbar::set_narrow(narrow);
     crate::tracklist::set_narrow(narrow);
     let Some(ui) = ui() else { return };
-    for page in ui.borrow().pages.values() {
+    let u = ui.borrow();
+    if let Some(t) = &u.app_title {
+        t.set_visible(!narrow);
+    }
+    u.search.set_placeholder_text(Some(if narrow { SEARCH_HINT_NARROW } else { SEARCH_HINT }));
+    u.search.set_width_chars(if narrow { 24 } else { 40 });
+    for page in u.pages.values() {
         mark_page(page, narrow);
     }
 }
@@ -755,6 +815,12 @@ pub fn navigate(id: &str) {
 
 fn go(id: &str, record: bool) {
     let Some(ui) = ui() else { return };
+    // Recently added, recently played and most played were pages of their own.
+    if sections::smart::TABS.iter().any(|(t, _)| *t == id) {
+        go("recent", record);
+        sections::smart::set_tab(id);
+        return;
+    }
     // Settings and the equalizer are cards over the window, not pages.
     if id == "settings" || id == "equalizer" {
         if id == "settings" {
@@ -766,11 +832,11 @@ fn go(id: &str, record: bool) {
             return;
         }
     }
-    let id = if id == "settings" || id == "equalizer" { "albums" } else { id };
+    let id = if id == "settings" || id == "equalizer" { "home" } else { id };
     if id.starts_with("playlist:") && !store::loaded() {
         PENDING.with(|p| *p.borrow_mut() = Some(id.to_string()));
     }
-    let id = if ensure_built(id) { id.to_string() } else { "albums".to_string() };
+    let id = if ensure_built(id) { id.to_string() } else { "home".to_string() };
     if !ensure_built(&id) {
         return;
     }
@@ -792,10 +858,9 @@ fn go(id: &str, record: bool) {
     u.current = id.clone();
     let title = page_title(&u.sections, &id);
     chrome::set_title(&u.window, "Music", &title);
-    u.subtitle.set_text(&title);
-    u.subtitle.set_visible(!title.is_empty());
     let search = u.search.clone();
     drop(u);
+    page_changed(&id);
     if id != "search" {
         if !search.text().is_empty() {
             ui.borrow_mut().before_search.clear();
@@ -803,6 +868,27 @@ fn go(id: &str, record: bool) {
         }
         prefs::update(|p| p.last_section = id);
     }
+}
+
+type PageListener = (glib::WeakRef<gtk::Widget>, Box<dyn Fn(&str)>);
+
+thread_local! {
+    static PAGE_LISTENERS: RefCell<Vec<PageListener>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Call `f` with the page's id whenever the window shows another page, while `owner` is alive.
+pub fn on_page(owner: &impl IsA<gtk::Widget>, f: impl Fn(&str) + 'static) {
+    PAGE_LISTENERS.with(|l| l.borrow_mut().push((owner.upcast_ref::<gtk::Widget>().downgrade(), Box::new(f))));
+}
+
+fn page_changed(id: &str) {
+    PAGE_LISTENERS.with(|l| {
+        let mut l = l.borrow_mut();
+        l.retain(|(w, _)| w.upgrade().is_some());
+        for (_, f) in l.iter() {
+            f(id);
+        }
+    });
 }
 
 thread_local! {
@@ -879,15 +965,17 @@ fn refresh_playlists() {
     }
     ui.borrow_mut().nav_items.retain(|k, _| !k.starts_with("playlist:"));
     let current = ui.borrow().current.clone();
+    let mut items = HashMap::new();
     for p in store::playlists() {
-        let (button, label) = nav_button("music-playlist-symbolic", &p.name, &p.name);
-        label.add_css_class("compact-hide");
+        let item = nyx_ui::sidebar::nav_item("music-playlist-symbolic", &p.name, &p.name);
+        let button = item.button.clone();
         // Icon-only, every playlist would look the same: show its initial instead.
         if let Some(content) = button.child().and_downcast::<gtk::Box>() {
             if let Some(icon) = content.first_child() {
                 icon.add_css_class("compact-hide");
             }
             let initial = widgets::label(&initial_of(&p.name), "nav-initial");
+            initial.set_valign(gtk::Align::Center);
             initial.add_css_class("compact-show");
             initial.set_visible(false);
             content.prepend(&initial);
@@ -901,9 +989,22 @@ fn refresh_playlists() {
         sections::playlist::accept_drops(&button, p.id);
         bx.append(&button);
         ui.borrow_mut().nav_items.insert(id, button);
+        items.insert(p.id, item);
     }
     let nav = ui.borrow().nav.clone();
     set_compact_hidden(&nav, nav.has_css_class("compact"));
+    sections::playlist::load_items(move |lists| {
+        for (p, songs) in lists {
+            if let Some(item) = items.get(&p.id) {
+                item.set_count(Some(songs.len() as u64));
+                set_readout_text(&item.button, songs.len());
+            }
+        }
+        if let Some(u) = self::ui() {
+            let nav = u.borrow().nav.clone();
+            set_compact_hidden(&nav, nav.has_css_class("compact"));
+        }
+    });
     if let Some(id) = PENDING.with(|p| p.borrow_mut().take()) {
         navigate(&id);
     }

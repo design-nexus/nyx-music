@@ -250,6 +250,38 @@ impl Cover {
         Cover { root, picture, placeholder, key: Default::default(), small }
     }
 
+    /// A cover as wide as its column and as tall as it is wide; unlike [`Cover::new`],
+    /// it can shrink with the window.
+    pub fn fluid(small: bool) -> Cover {
+        let root = gtk::Overlay::new();
+        root.add_css_class("cover");
+        root.set_overflow(gtk::Overflow::Hidden);
+        let square = gtk::DrawingArea::new();
+        square.set_hexpand(true);
+        // A resize asked for while GTK is allocating is lost: ask after it.
+        square.connect_resize(|area, w, _| {
+            if area.content_height() != w {
+                let area = area.downgrade();
+                glib::idle_add_local_once(move || {
+                    if let Some(area) = area.upgrade() {
+                        area.set_content_height(area.width().max(1));
+                    }
+                });
+            }
+        });
+        root.set_child(Some(&square));
+        let placeholder = gtk::Image::from_icon_name("media-optical-symbolic");
+        placeholder.add_css_class("cover-placeholder");
+        placeholder.set_pixel_size(32);
+        root.add_overlay(&placeholder);
+        let picture = gtk::Picture::new();
+        picture.set_content_fit(gtk::ContentFit::Cover);
+        picture.set_can_shrink(true);
+        picture.set_visible(false);
+        root.add_overlay(&picture);
+        Cover { root, picture, placeholder, key: Default::default(), small }
+    }
+
     /// Resize (Now playing scales its cover with the window).
     pub fn set_size(&self, size: i32) {
         self.root.set_size_request(size, size);

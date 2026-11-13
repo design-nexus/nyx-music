@@ -10,6 +10,7 @@ pub mod albums;
 pub mod artists;
 pub mod equalizer;
 pub mod folders;
+pub mod home;
 pub mod now_playing;
 pub mod playlist;
 pub mod podcasts;
@@ -46,10 +47,19 @@ pub fn all() -> Vec<Section> {
     };
     vec![
         s(
+            "home",
+            "Home",
+            "go-home-symbolic",
+            "",
+            "Albums to jump back into, new episodes, your stations and what you play most.",
+            home::build,
+            false,
+        ),
+        s(
             "now-playing",
             "Now playing",
             "music-spectrum-symbolic",
-            "Library",
+            "",
             "The current song, its spectrum and what's up next.",
             now_playing::build,
             true,
@@ -68,24 +78,14 @@ pub fn all() -> Vec<Section> {
         s("genres", "Genres", "music-genre-symbolic", "Library", "Your music by genre.", artists::build_genres, true),
         s("folders", "Folders", "folder-music-symbolic", "Library", "Your music as it's laid out on disk.", folders::build, true),
         s(
-            "recently-added",
-            "Recently added",
-            "music-new-symbolic",
-            "Library",
-            "The albums that joined your library last.",
-            smart::build_added,
-            true,
-        ),
-        s(
-            "recently-played",
-            "Recently played",
+            "recent",
+            "Recent and most played",
             "document-open-recent-symbolic",
             "Library",
-            "Songs you've played, newest first.",
-            smart::build_recent,
+            "The albums that joined your library last, and the songs you've played lately and most.",
+            smart::build,
             true,
         ),
-        s("most-played", "Most played", "starred-symbolic", "Library", "The songs you play most.", smart::build_most, true),
         s(
             "radio",
             "Radio",
@@ -104,7 +104,7 @@ pub fn all() -> Vec<Section> {
             podcasts::build,
             true,
         ),
-        s("queue", "Queue", "music-queue-symbolic", "Playlists", "What's playing now and next.", queue::build, true),
+        s("queue", "Up next", "music-queue-symbolic", "Playlists", "What's playing now and next.", queue::build, true),
         // Opened from the top bar as a card over the window, not listed in the sidebar.
         Section {
             nav: false,

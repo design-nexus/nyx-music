@@ -396,6 +396,36 @@ pub fn new_count(p: &Podcast) -> usize {
     })
 }
 
+/// Out since you subscribed to its show, and not started.
+pub fn is_new(t: &Track) -> bool {
+    with(|o| {
+        let Some(p) = o.podcasts.iter().find(|p| p.feed == t.feed) else { return false };
+        o.info.get(&t.path).is_some_and(|i| i.published > p.added)
+            && o.progress.get(&t.path).is_none_or(|pr| !pr.played && pr.position <= 0.0)
+    })
+}
+
+/// New episodes across every subscription.
+pub fn new_total() -> usize {
+    podcasts().iter().map(new_count).sum()
+}
+
+/// For Home: from each subscription, the episode you're part-way through or else
+/// its newest new one, newest first.
+pub fn fresh_episodes(n: usize) -> Vec<Rc<Track>> {
+    let mut picks: Vec<(bool, i64, Rc<Track>)> = podcasts()
+        .iter()
+        .filter_map(|p| {
+            let eps = episodes(&p.feed);
+            let started = eps.iter().find(|t| progress(&t.path).position > 0.0 && !progress(&t.path).played);
+            let pick = started.or_else(|| eps.iter().find(|t| is_new(t)))?;
+            Some((started.is_some(), info(&pick.path).published, pick.clone()))
+        })
+        .collect();
+    picks.sort_by_key(|(started, published, _)| std::cmp::Reverse((*started, *published)));
+    picks.into_iter().take(n).map(|(_, _, t)| t).collect()
+}
+
 fn episode_track(feed_url: &str, feed: &Feed, e: &Episode) -> (Track, EpisodeInfo) {
     (
         Track {

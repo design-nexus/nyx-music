@@ -12,6 +12,20 @@ use std::rc::Rc;
 
 const UP_NEXT: usize = 5;
 
+thread_local! {
+    /// The Spectrum and Lyrics switch, once the page is built.
+    static VIEW_SWITCH: RefCell<Option<gtk::Box>> = const { RefCell::new(None) };
+}
+
+/// Show the lyrics (now, or when the page is first built).
+pub fn show_lyrics() {
+    let switch = VIEW_SWITCH.with(|s| s.borrow().clone());
+    match switch.and_then(|s| s.last_child()).and_downcast::<gtk::ToggleButton>() {
+        Some(b) => b.set_active(true),
+        _ => prefs::update(|p| p.now_view = "lyrics".into()),
+    }
+}
+
 fn link(class: &str) -> (gtk::Button, gtk::Label) {
     let b = gtk::Button::new();
     b.add_css_class("flat");
@@ -130,6 +144,7 @@ pub fn build(page: &Page) {
         })
     };
     switch.set_visible(has_spectrum);
+    VIEW_SWITCH.with(|s| *s.borrow_mut() = Some(switch.clone()));
     switch.set_hexpand(true);
     switch.set_halign(gtk::Align::Start);
     an_head.append(&switch);

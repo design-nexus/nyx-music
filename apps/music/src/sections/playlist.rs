@@ -13,6 +13,24 @@ use std::rc::Rc;
 
 const DRAG_PREFIX: &str = "nyx-music-paths\n";
 
+/// Every playlist with its songs, read off the UI thread.
+pub fn load_items(done: impl FnOnce(Vec<(db::Playlist, Vec<PathBuf>)>) + 'static) {
+    let lists = store::playlists();
+    crate::cmd::background(
+        move || -> anyhow::Result<Vec<(db::Playlist, Vec<PathBuf>)>> {
+            let c = db::open()?;
+            lists
+                .into_iter()
+                .map(|p| {
+                    let items = db::playlist_paths(&c, p.id)?;
+                    Ok((p, items))
+                })
+                .collect()
+        },
+        |r| done(r.unwrap_or_default()),
+    );
+}
+
 /// What a song drag carries: a marker line, then one path per line.
 pub fn drag_payload(paths: &[String]) -> String {
     format!("{DRAG_PREFIX}{}", paths.join("\n"))

@@ -50,7 +50,7 @@ pub fn description(app_id: &str) -> Value {
              "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
              "annotations": {"title": "Playlists"}, "x-nyx": {"risk": "read_only", "result": "list"}},
             {"name": "music.open", "description": "Open Music's window, at a page when given.",
-             "inputSchema": {"type": "object", "properties": {"section": {"enum": ["now-playing", "songs", "albums", "artists", "genres", "folders", "recently-added", "recently-played", "most-played", "radio", "podcasts", "queue", "equalizer", "settings"]}}, "additionalProperties": false},
+             "inputSchema": {"type": "object", "properties": {"section": {"enum": ["home", "now-playing", "songs", "albums", "artists", "genres", "folders", "recent", "recently-added", "recently-played", "most-played", "radio", "podcasts", "queue", "equalizer", "settings"]}}, "additionalProperties": false},
              "annotations": {"title": "Open Music"}, "x-nyx": {"risk": "writes", "confirmation": "never", "positional": ["section"], "result": "none"}}
         ],
         "nyx": {
