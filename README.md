@@ -21,7 +21,7 @@ half-screen tile.
   - Multi-disc albums list each disc under its own heading.
   - **Artists** and **Genres**, each opening into their albums.
   - **Folders:** your music as it's laid out on disk.
-  - **Recent and most played:** recently added albums, and the songs you played lately
+  - **Recent:** recently added albums, and the songs you played lately
     and most, on one page.
   - **Search** (<kbd>Ctrl</kbd>+<kbd>F</kbd>) across songs, albums and artists. Accents
     don't matter: "beyonce" finds Beyoncé.

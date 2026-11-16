@@ -61,7 +61,7 @@ pub struct Prefs {
     pub radio_tab: String,
     /// The tab Find a podcast opens on.
     pub podcast_tab: String,
-    /// The list Recent and most played shows.
+    /// The list Recent shows.
     pub recent_tab: String,
     /// Check subscribed podcasts for new episodes when Music opens.
     pub podcast_refresh: bool,

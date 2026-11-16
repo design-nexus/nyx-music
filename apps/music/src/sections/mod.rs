@@ -79,7 +79,7 @@ pub fn all() -> Vec<Section> {
         s("folders", "Folders", "folder-music-symbolic", "Library", "Your music as it's laid out on disk.", folders::build, true),
         s(
             "recent",
-            "Recent and most played",
+            "Recent",
             "document-open-recent-symbolic",
             "Library",
             "The albums that joined your library last, and the songs you've played lately and most.",
