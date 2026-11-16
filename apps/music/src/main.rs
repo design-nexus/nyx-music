@@ -118,7 +118,7 @@ fn main() -> glib::ExitCode {
     // sleeping discrete GPU on hybrid laptops. GL renders only on the one in use.
     if std::env::var_os("GSK_RENDERER").is_none() {
         // SAFETY: still single-threaded; nothing else reads the environment yet.
-        unsafe { std::env::set_var("GSK_RENDERER", "ngl") };
+        unsafe { std::env::set_var("GSK_RENDERER", "gl") };
     }
 
     // Started by D-Bus for an action (no window): GLib leaves this flag to apps that
