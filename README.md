@@ -1,7 +1,7 @@
 # Music
 
-A music player for [Omarchy](https://omarchy.org). It plays your music library and
-shows it as a live spectrum. It takes its colors from your Omarchy theme and fits a
+A music player for NyxOS and [Omarchy](https://omarchy.org). It plays your music library and
+shows it as a live spectrum. It takes its colors from the desktop theme and fits a
 half-screen tile.
 
 ## What it does
@@ -67,6 +67,8 @@ half-screen tile.
 - **Notifications** when the song changes while the window is in the background.
 
 ## Install
+
+On NyxOS, choose Music in Welcome when you set up, or install it later from the Store or with `nyx install nyx-music`. On Omarchy:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/design-nexus/nyx-music/main/install.sh | bash -s -- music
