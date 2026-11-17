@@ -1,4 +1,4 @@
-//! Music — a music player for Omarchy.
+//! Music — a music player for NyxOS and Omarchy.
 
 mod cmd;
 mod control;
