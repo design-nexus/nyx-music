@@ -60,6 +60,7 @@ pub fn build(page: &Page) {
         Some(("Play everything", Box::new(player::play))),
     );
     stack.add_named(&empty, Some("empty"));
+    stack.add_named(&crate::audiobookshelf::ui::now_playing(), Some("spoken"));
 
     // Two columns over a blurred copy of the cover: the cover and the song on the
     // left; the spectrum (or lyrics) and what's up next on the right. A half-screen
@@ -190,6 +191,11 @@ pub fn build(page: &Page) {
             Kind::File => super::albums::show(&k.borrow()),
             Kind::Station => crate::window::navigate("radio"),
             Kind::Episode => super::podcasts::show(&t.feed),
+            Kind::Audiobook => {
+                if let Some(b) = crate::audiobookshelf::playback::current_book() {
+                    crate::audiobookshelf::ui::show(b);
+                }
+            }
         }
     });
 
@@ -237,7 +243,7 @@ pub fn build(page: &Page) {
             Event::Track => {
                 match player::current() {
                     Some(t) => {
-                        stack.set_visible_child_name("playing");
+                        stack.set_visible_child_name(if t.kind == Kind::Audiobook { "spoken" } else { "playing" });
                         cover.set_placeholder(crate::playerbar::placeholder_icon(&t));
                         cover.set_key(&t.art);
                         set_backdrop(&t.art);
@@ -264,6 +270,10 @@ pub fn build(page: &Page) {
                             Kind::Station => {
                                 m.push("LIVE".into());
                                 m.push(crate::online::http::host(&t.path.to_string_lossy()).to_string());
+                            }
+                            Kind::Audiobook => {
+                                m.push(fmt::time(t.duration));
+                                m.push("Audiobookshelf".into());
                             }
                             Kind::Episode => {
                                 if t.duration > 0.0 {
@@ -384,15 +394,7 @@ impl LyricsView {
             Some("none"),
         );
         root.set_visible_child_name("none");
-        LyricsView {
-            root,
-            scroll,
-            lines,
-            text: Rc::default(),
-            rows: Rc::default(),
-            current: Rc::default(),
-            path: Rc::default(),
-        }
+        LyricsView { root, scroll, lines, text: Rc::default(), rows: Rc::default(), current: Rc::default(), path: Rc::default() }
     }
 
     fn load(&self, t: &crate::library::Track) {

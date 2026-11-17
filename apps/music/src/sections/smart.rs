@@ -24,6 +24,7 @@ thread_local! {
 }
 
 pub fn build(page: &Page) {
+    page.body.append(&super::music_chips("recent"));
     page.body.append(&scan_banner());
     let head = widgets::hbox(12);
     head.add_css_class("list-toolbar");

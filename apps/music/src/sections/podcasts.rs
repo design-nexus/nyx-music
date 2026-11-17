@@ -293,8 +293,9 @@ impl EpisodeRow {
         self.downloaded.set_visible(state.is_none() && t.download.is_some());
         self.downloading.set_visible(state.is_some());
         if let Some((done, total)) = state {
-            self.downloading
-                .set_text(&(done * 100).checked_div(total).map_or_else(|| "Downloading…".to_string(), |p| format!("Downloading {p}%")));
+            self.downloading.set_text(
+                &(done * 100).checked_div(total).map_or_else(|| "Downloading…".to_string(), |p| format!("Downloading {p}%")),
+            );
         }
         self.download.set_visible(t.download.is_none() && !pr.played);
         self.download.set_sensitive(state.is_none());
@@ -578,6 +579,7 @@ fn open_feed(feed: &str, show: Option<Show>) {
     if mine {
         refresh_strip();
     }
+    detail.append(&crate::audiobookshelf::ui::podcast_source(feed));
     let feed = feed.to_string();
     let loaded: Rc<RefCell<Option<Feed>>> = Rc::default();
     let h = header_for(&feed, show.as_ref(), None);
@@ -851,7 +853,6 @@ fn two_lines(name: &str, width: usize) -> String {
     lines.join("\n")
 }
 
-
 /// Rebuild the row of shows, keeping (or making) a choice.
 fn refresh_strip() {
     let Some((strip, home)) = STRIP.with(|s| s.borrow().clone()) else { return };
@@ -1039,6 +1040,7 @@ fn find_view() -> gtk::Widget {
 }
 
 pub fn build(page: &Page) {
+    page.body.append(&crate::audiobookshelf::ui::podcasts_widget());
     let p = prefs::get();
     let outer = gtk::Stack::new();
     outer.set_vexpand(true);

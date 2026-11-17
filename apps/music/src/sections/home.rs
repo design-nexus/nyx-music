@@ -22,18 +22,19 @@ const TOP: usize = 6;
 pub fn build(page: &Page) {
     let body = page.body.clone();
     body.add_css_class("home");
-    body.append(&section_head("Jump back in", None));
+    body.append(&continue_listening());
+    body.append(&section_head("Jump back in", Some(("Music", "music"))));
     body.append(&jump_back_in(&body));
 
     let two = gtk::Box::new(gtk::Orientation::Horizontal, 18);
     two.set_homogeneous(true);
     two.add_css_class("home-two");
     let eps = widgets::vbox(0);
-    eps.append(&section_head("New episodes", Some(("All podcasts", "podcasts"))));
+    eps.append(&section_head("New episodes", Some(("Podcasts", "podcasts"))));
     eps.append(&new_episodes());
     two.append(&eps);
     let st = widgets::vbox(0);
-    st.append(&section_head("Your stations", Some(("All radio", "radio"))));
+    st.append(&section_head("Your stations", Some(("Radio", "radio"))));
     st.append(&stations());
     two.append(&st);
     body.append(&two);
@@ -571,3 +572,114 @@ fn most_played(body: &gtk::Box) -> gtk::Widget {
     body.connect_css_classes_notify(move |b| g.set_max_children_per_line(if b.has_css_class("narrow") { 2 } else { 3 }));
     stack.upcast()
 }
+
+// ---------- Continue listening (audiobooks) ----------
+
+/// Horizontal continue strip matching the Audiobooks library mockup.
+fn continue_listening() -> gtk::Box {
+    use crate::audiobookshelf as abs;
+    let root = widgets::vbox(0);
+    root.append(&section_head("Continue listening", Some(("Audiobooks", "audiobooks"))));
+    let strip = widgets::hbox(12);
+    strip.add_css_class("abs-cont-strip");
+    let scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .vscrollbar_policy(gtk::PolicyType::Never)
+        .child(&strip)
+        .build();
+    scroll.set_propagate_natural_height(true);
+    root.append(&scroll);
+    let signature = Rc::new(RefCell::new(String::new()));
+    let refresh = {
+        let root = root.clone();
+        let strip = strip.clone();
+        move || {
+            let config = abs::config();
+            let progress = abs::storage::progress_map(&config);
+            let mut books: Vec<_> = abs::storage::books(&config)
+                .into_iter()
+                .filter(|b| !b.podcast && b.id.episode.is_none() && config.libraries.contains(&b.library))
+                .collect();
+            books.sort_by_key(|b| std::cmp::Reverse(progress.get(&b.id.key()).map_or(0, |p| p.updated)));
+            let mut rows = Vec::new();
+            for b in books {
+                let p = progress.get(&b.id.key()).cloned().unwrap_or_default();
+                if p.position > 0.0 && !p.finished {
+                    rows.push(b);
+                    if rows.len() >= 3 {
+                        break;
+                    }
+                }
+            }
+            root.set_visible(!rows.is_empty());
+            let next = rows.iter().map(|b| b.id.key()).collect::<Vec<_>>().join("|");
+            if *signature.borrow() == next {
+                return;
+            }
+            *signature.borrow_mut() = next;
+            clear(&strip);
+            for book in rows {
+                strip.append(&home_continue_card(&book));
+            }
+        }
+    };
+    refresh();
+    abs::subscribe(&root, refresh.clone());
+    player::subscribe(&root, move |event| {
+        if matches!(event, Event::Track | Event::State) {
+            refresh();
+        }
+    });
+    root
+}
+
+fn home_continue_card(book: &crate::audiobookshelf::model::Book) -> gtk::Box {
+    use crate::audiobookshelf as abs;
+    let card = widgets::hbox(12);
+    card.add_css_class("abs-cont-card");
+    let cover = Cover::new(72, true);
+    cover.set_placeholder("accessories-dictionary-symbolic");
+    cover.set_key(&book.art);
+    card.append(&cover.root);
+    let ready = cover.clone();
+    let key = book.art.clone();
+    abs::cover(book, move || ready.set_key(&key));
+    let meta = widgets::vbox(2);
+    meta.set_hexpand(true);
+    let title = widgets::label(&book.title, "abs-cont-title");
+    title.set_xalign(0.0);
+    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    meta.append(&title);
+    let author = widgets::label(&book.author, "dim");
+    author.set_xalign(0.0);
+    author.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    meta.append(&author);
+    let p = abs::storage::progress(&book.id);
+    let left = if p.finished {
+        "Completed".into()
+    } else {
+        format!("{} left", fmt::time((book.duration - p.position).max(0.0)))
+    };
+    let left_l = widgets::label(&left, "abs-cont-left");
+    left_l.set_xalign(0.0);
+    meta.append(&left_l);
+    if p.position > 0.0 && book.duration > 0.0 && !p.finished {
+        let bar = gtk::ProgressBar::new();
+        bar.add_css_class("abs-pbar-mini");
+        bar.set_fraction((p.position / book.duration).clamp(0.0, 1.0));
+        meta.append(&bar);
+    }
+    card.append(&meta);
+    let b = book.clone();
+    let play = play_button(is_current(std::path::Path::new(&book.id.key())) && player::state() == State::Playing, p.position > 0.0);
+    play.add_css_class("abs-play-ib");
+    play.connect_clicked(move |_| abs::playback::start(b.clone()));
+    card.append(&play);
+    let open = book.clone();
+    let click = gtk::GestureClick::new();
+    click.connect_released(move |_, _, _, _| abs::ui::show(open.clone()));
+    card.add_controller(click);
+    card.set_cursor_from_name(Some("pointer"));
+    card
+}
+

@@ -75,6 +75,7 @@ pub fn placeholder_icon(t: &crate::library::Track) -> &'static str {
     match t.kind {
         crate::library::Kind::Station => "music-radio-symbolic",
         crate::library::Kind::Episode => "music-podcast-symbolic",
+        crate::library::Kind::Audiobook => "accessories-dictionary-symbolic",
         crate::library::Kind::File => "media-optical-symbolic",
     }
 }
@@ -161,9 +162,8 @@ fn sleep_button() -> gtk::MenuButton {
         b.connect_clicked(move |_| {
             p.popdown();
             // Timed choices start counting when picked.
-            let s = minutes.map_or(choice, |m| {
-                player::Sleep::At(std::time::Instant::now() + std::time::Duration::from_secs(m * 60))
-            });
+            let s =
+                minutes.map_or(choice, |m| player::Sleep::At(std::time::Instant::now() + std::time::Duration::from_secs(m * 60)));
             player::set_sleep(s);
             if s != player::Sleep::Off {
                 window::toast(&format!("Sleep timer: {}.", sleep_text(s)));
@@ -291,10 +291,32 @@ pub fn build() -> gtk::Box {
     shuffle.update_property(&[gtk::accessible::Property::Label("Shuffle")]);
     play.update_property(&[gtk::accessible::Property::Label("Play")]);
     repeat.update_property(&[gtk::accessible::Property::Label("Repeat")]);
-    for w in [shuffle.upcast_ref::<gtk::Widget>(), prev.upcast_ref(), play.upcast_ref(), next.upcast_ref(), repeat.upcast_ref()] {
+    // Spoken mode keeps this same transport row: skip swaps in for shuffle/repeat.
+    let skip_back = widgets::icon_button("media-seek-backward-symbolic", "Skip backward");
+    skip_back.add_css_class("transport-toggle");
+    skip_back.connect_clicked(|_| player::seek_by(-crate::audiobookshelf::config().backward));
+    let skip_fwd = widgets::icon_button("media-seek-forward-symbolic", "Skip forward");
+    skip_fwd.add_css_class("transport-toggle");
+    skip_fwd.connect_clicked(|_| player::seek_by(crate::audiobookshelf::config().forward));
+    for w in [
+        shuffle.upcast_ref::<gtk::Widget>(),
+        skip_back.upcast_ref(),
+        prev.upcast_ref(),
+        play.upcast_ref(),
+        next.upcast_ref(),
+        skip_fwd.upcast_ref(),
+        repeat.upcast_ref(),
+    ] {
         w.set_focus_on_click(false);
         controls.append(w);
     }
+    let spoken_on = crate::audiobookshelf::playback::active();
+    shuffle.set_visible(!spoken_on);
+    repeat.set_visible(!spoken_on);
+    skip_back.set_visible(spoken_on);
+    skip_fwd.set_visible(spoken_on);
+    prev.set_tooltip_text(Some(if spoken_on { "Previous chapter" } else { "Previous (Ctrl+←)" }));
+    next.set_tooltip_text(Some(if spoken_on { "Next chapter" } else { "Next (Ctrl+→)" }));
     center.append(&controls);
 
     let seek_row = widgets::hbox(10);
@@ -316,18 +338,36 @@ pub fn build() -> gtk::Box {
     center.append(&seek_row);
     bar.append(&center);
 
-    // ----- Lyrics, Up next, the equalizer, sleep and volume -----
+    // ----- Lyrics / Up next (music) or Bookmark / Details (spoken), then EQ, sleep, volume -----
     let right = widgets::hbox(2);
     right.set_valign(gtk::Align::Center);
     right.set_halign(gtk::Align::End);
-    right.append(&page_toggle(
+    let lyrics = page_toggle(
         "format-justify-left-symbolic",
         "Lyrics",
         "Lyrics",
         |page| page == "now-playing" && prefs::get().now_view == "lyrics",
         window::toggle_lyrics,
-    ));
-    right.append(&page_toggle("music-queue-symbolic", "Up next", "Up next", |page| page == "queue", window::toggle_queue));
+    );
+    let up_next = page_toggle("music-queue-symbolic", "Up next", "Up next", |page| page == "queue", window::toggle_queue);
+    let bookmark = widgets::icon_button("bookmark-new-symbolic", "Add bookmark");
+    bookmark.set_focus_on_click(false);
+    bookmark.connect_clicked(|_| crate::audiobookshelf::playback::bookmark());
+    let details = widgets::icon_button("accessories-dictionary-symbolic", "Book details");
+    details.set_focus_on_click(false);
+    details.connect_clicked(|_| {
+        if let Some(b) = crate::audiobookshelf::playback::current_book() {
+            crate::audiobookshelf::ui::show(b);
+        }
+    });
+    right.append(&lyrics);
+    right.append(&up_next);
+    right.append(&bookmark);
+    right.append(&details);
+    lyrics.set_visible(!spoken_on);
+    up_next.set_visible(!spoken_on);
+    bookmark.set_visible(spoken_on);
+    details.set_visible(spoken_on);
     let eq = widgets::icon_button("music-equalizer-symbolic", "Equalizer");
     eq.set_focus_on_click(false);
     eq.connect_clicked(|_| window::open_equalizer());
@@ -441,13 +481,40 @@ pub fn build() -> gtk::Box {
     });
 
     let refresh = {
-        let (cover, title, artist, play, shuffle, repeat, seek, pos, dur, mute, volume, syncing, prev, next) = (
+        let (
+            cover,
+            title,
+            artist,
+            play,
+            shuffle,
+            repeat,
+            skip_back,
+            skip_fwd,
+            lyrics,
+            up_next,
+            bookmark,
+            details,
+            seek,
+            pos,
+            dur,
+            mute,
+            volume,
+            syncing,
+            prev,
+            next,
+        ) = (
             cover.clone(),
             title.clone(),
             artist.clone(),
             play.clone(),
             shuffle.clone(),
             repeat.clone(),
+            skip_back.clone(),
+            skip_fwd.clone(),
+            lyrics.clone(),
+            up_next.clone(),
+            bookmark.clone(),
+            details.clone(),
             seek.clone(),
             pos.clone(),
             dur.clone(),
@@ -474,6 +541,17 @@ pub fn build() -> gtk::Box {
                         cover.set_key("");
                     }
                 }
+                let spoken = crate::audiobookshelf::playback::active();
+                shuffle.set_visible(!spoken);
+                repeat.set_visible(!spoken);
+                skip_back.set_visible(spoken);
+                skip_fwd.set_visible(spoken);
+                lyrics.set_visible(!spoken);
+                up_next.set_visible(!spoken);
+                bookmark.set_visible(spoken);
+                details.set_visible(spoken);
+                prev.set_tooltip_text(Some(if spoken { "Previous chapter" } else { "Previous (Ctrl+←)" }));
+                next.set_tooltip_text(Some(if spoken { "Next chapter" } else { "Next (Ctrl+→)" }));
                 let live = player::is_live();
                 seek.set_sensitive(!live);
                 let d = player::duration();

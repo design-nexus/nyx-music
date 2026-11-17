@@ -619,6 +619,11 @@ fn set_download(path: &Path, file: Option<PathBuf>) {
     crate::player::library_changed();
 }
 
+
+pub fn downloaded() -> Vec<Rc<Track>> {
+    with(|o| o.items.values().filter(|t| t.download.as_ref().is_some_and(|p| p.exists())).cloned().collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -10,6 +10,7 @@ pub use nyx_ui::settings_card::{escape, fit, focus_search, is_open};
 
 /// Each settings group's icon and one-line summary in the dialog's list.
 const GROUPS: &[(&str, &str, &str)] = &[
+    ("Audiobookshelf", "accessories-dictionary-symbolic", "Connection, libraries, listening and downloads"),
     ("Library", "folder-music-symbolic", "Folders, rescans"),
     ("Radio and podcasts", "music-radio-symbolic", "Country, new episodes"),
     ("Playback", "media-playback-start-symbolic", "Gapless, crossfade, leveling"),
@@ -25,7 +26,7 @@ const SPEC: Spec = Spec {
             name: "Music",
             icon: "io.github.design_nexus.nyx.Music",
             version: env!("CARGO_PKG_VERSION"),
-            description: "Your music library, playlists, internet radio and podcasts.",
+            description: "Your music, audiobooks, playlists, internet radio and podcasts.",
             licence: "MIT",
             website: "https://github.com/design-nexus/nyx-music",
             issues: "https://github.com/design-nexus/nyx-music/issues",
@@ -45,3 +46,6 @@ pub fn open() {
         (page.root.upcast(), page.body)
     });
 }
+
+/// Open a specific settings group without rebuilding the settings card.
+pub fn open_group(group:&str){open();settings_card::select(group);}

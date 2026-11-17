@@ -30,3 +30,9 @@ unicode-normalization = "0.1.25"
 ureq = { version = "3", features = ["json"] }
 walkdir = "2.5"
 zbus = "5"
+
+nyx-sync = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "fs", "io-util"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"

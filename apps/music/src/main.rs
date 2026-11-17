@@ -1,5 +1,6 @@
 //! Music — a music player for NyxOS and Omarchy.
 
+mod audiobookshelf;
 mod cmd;
 mod control;
 mod eq;
@@ -36,7 +37,7 @@ const USAGE: &str = "Usage: nyx-music [OPTIONS] [FILES…]\n\
   --section ID    open (or switch the open window) to a page: home, now-playing, songs,\n\
                   albums, artists, genres, folders, recent (or one of its lists:\n\
                   recently-added, recently-played, most-played), radio, podcasts, queue,\n\
-                  equalizer, settings\n\
+                  audiobooks, downloads, equalizer, settings\n\
   --toggle        close the window if it's open, otherwise open it (for a keybinding)\n\
   --mini          open or close the mini player\n\
   --play-pause, --play, --pause, --stop, --next, --previous\n\
@@ -69,6 +70,7 @@ fn start(app: &gtk::Application) {
     }
     online::init();
     player::init();
+    audiobookshelf::init();
     library::store::reload();
     // Let the window appear first, then look for new music.
     glib::timeout_add_local_once(std::time::Duration::from_millis(600), || library::store::rescan(false));
@@ -231,6 +233,7 @@ fn main() -> glib::ExitCode {
         glib::ExitCode::SUCCESS
     });
     app.connect_shutdown(|_| {
+        audiobookshelf::playback::shutdown();
         player::save();
         prefs::flush();
         player::stop();

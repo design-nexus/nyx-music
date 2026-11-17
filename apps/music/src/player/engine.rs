@@ -115,6 +115,7 @@ impl Engine {
         let bin = gst::Bin::with_name("music-filter");
         let convert_in = make("audioconvert");
         let eq = make("equalizer-10bands");
+        let tempo = make("scaletempo");
         let gain = make("volume");
         let convert_out = make("audioconvert");
         let spectrum = make("spectrum");
@@ -127,7 +128,7 @@ impl Engine {
             s.set_property("message-phase", false);
         }
         let chain: Vec<gst::Element> =
-            [convert_in, eq.clone(), gain.clone(), convert_out, spectrum.clone()].into_iter().flatten().collect();
+            [convert_in, tempo, eq.clone(), gain.clone(), convert_out, spectrum.clone()].into_iter().flatten().collect();
         if let (Some(first), Some(last)) = (chain.first(), chain.last()) {
             bin.add_many(&chain)?;
             gst::Element::link_many(&chain)?;
@@ -239,6 +240,21 @@ impl Engine {
         self.frames.clear();
         let t = gst::ClockTime::from_nseconds((secs.max(0.0) * 1e9) as u64);
         let _ = self.playbin.seek_simple(gst::SeekFlags::FLUSH | gst::SeekFlags::ACCURATE, t);
+    }
+
+    /// Seek with a positive spoken-media playback rate.
+    pub fn seek_rate(&mut self, secs: f64, rate: f64) -> bool {
+        self.frames.clear();
+        self.playbin
+            .seek(
+                rate.clamp(0.5, 3.0),
+                gst::SeekFlags::FLUSH | gst::SeekFlags::ACCURATE,
+                gst::SeekType::Set,
+                gst::ClockTime::from_nseconds((secs.max(0.0) * 1e9) as u64),
+                gst::SeekType::None,
+                gst::ClockTime::NONE,
+            )
+            .is_ok()
     }
 
     /// Linear volume, 0..1.

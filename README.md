@@ -41,6 +41,11 @@ half-screen tile.
   - Download episodes to play offline.
 - Stations and episodes go in the queue and in playlists alongside your songs, and
   pick up again after a restart.
+- **Audiobookshelf (optional):** native audiobook libraries, chapters, playback speed,
+  cross-device progress reconciliation, bookmarks, and offline downloads. Server-hosted
+  podcasts can be enabled alongside existing RSS subscriptions. Connect through
+  Settings → Audiobookshelf; credentials use the desktop keyring.
+  See [Audiobookshelf integration](docs/AUDIOBOOKSHELF.md) for behavior and validation limits.
 - **Now playing:** the cover and song over a blurred copy of the cover, a full-width
   spectrum analyzer or the lyrics, and what's up next.
   - Lyrics come from an `.lrc` file with the same name as the song, or from its tags.
@@ -92,7 +97,7 @@ nyx-music [OPTIONS] [FILES…]
 | --- | --- |
 | `FILES…` | Play these songs, folders or `.m3u` playlists, or a stream's web address |
 | `--enqueue` | Add `FILES` to the queue instead |
-| `--section ID` | Open a page: `home`, `now-playing`, `songs`, `albums`, `artists`, `genres`, `folders`, `recent` (or one of its lists: `recently-added`, `recently-played`, `most-played`), `radio`, `podcasts`, `queue`, `equalizer`, `settings` |
+| `--section ID` | Open a page: `home`, `now-playing`, `songs`, `albums`, `artists`, `genres`, `folders`, `recent` (or one of its lists: `recently-added`, `recently-played`, `most-played`), `radio`, `podcasts`, `audiobooks`, `downloads`, `queue`, `equalizer`, `settings` |
 | `--toggle` | Close the window if it's open, otherwise open it |
 | `--play-pause`, `--play`, `--pause`, `--stop`, `--next`, `--previous` | Control playback without raising the window |
 | `--sleep WHEN` | Set the sleep timer: a number of minutes, `song`, `album` or `off` |

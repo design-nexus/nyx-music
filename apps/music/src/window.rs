@@ -8,8 +8,8 @@ use crate::sections::{self, Section};
 use crate::widgets;
 use crate::{fmt, panel_dialog, player, playerbar, prefs, settings_dialog, theme};
 use gtk::prelude::*;
-use nyx_ui::chrome;
 use gtk::{gdk, glib};
+use nyx_ui::chrome;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -109,10 +109,15 @@ fn rail_divider(section: &str) -> gtk::Separator {
     bar
 }
 
-/// A sidebar group's heading in its section's colour (Library the app's accent,
-/// the others from the theme's `[sections.music]`); Playlists has its + for a new one.
+/// A sidebar group's heading in Design 2.0 colour: Listen is the app accent;
+/// Library / Playlists use `[sections.music]` (online / playlists).
 fn group_heading(group: &str) -> (gtk::Separator, gtk::Box) {
-    let section = if group == "Library" { nyx_ui::sidebar::ACCENT_SECTION.to_string() } else { group.to_lowercase() };
+    let section = match group {
+        "Listen" => nyx_ui::sidebar::ACCENT_SECTION.to_string(),
+        "Library" => "online".into(),
+        "Playlists" => "playlists".into(),
+        other => other.to_lowercase(),
+    };
     let heading = if group == "Playlists" {
         nyx_ui::sidebar::group_label_with_add(group, false, "New playlist, or import one", || {
             sections::playlist::new_dialog(Vec::new())
@@ -170,6 +175,9 @@ fn build(app: &gtk::Application) {
             counts.insert(s.id, item);
         }
         if s.id == "queue" {
+            let (divider, heading) = group_heading("Playlists");
+            list.append(&divider);
+            list.append(&heading);
             list.append(&playlist_box);
         }
     }
@@ -347,16 +355,13 @@ fn search_entry() -> gtk::SearchEntry {
 }
 
 /// Sections whose sidebar row shows how many things they hold (Podcasts: its new episodes).
-const COUNTED: &[&str] = &["songs", "albums", "artists", "genres", "radio", "podcasts", "queue"];
+const COUNTED: &[&str] = &["music", "radio", "podcasts", "queue"];
 
 fn refresh_counts(counts: &HashMap<&'static str, nyx_ui::sidebar::NavItem>) {
     let loaded = store::loaded();
     for (id, item) in counts {
         let n = match *id {
-            "songs" if loaded => store::tracks().len(),
-            "albums" if loaded => store::albums().len(),
-            "artists" if loaded => store::artists().len(),
-            "genres" if loaded => store::genres().len(),
+            "music" if loaded => store::albums().len(),
             "radio" => crate::online::favourites().len(),
             "podcasts" => crate::online::new_total(),
             "queue" => player::queue_items().0.len(),
@@ -832,7 +837,12 @@ fn go(id: &str, record: bool) {
             return;
         }
     }
-    let id = if id == "settings" || id == "equalizer" { "home" } else { id };
+    // Settings / equalizer fall through to Home; Songs is the Music peer's page.
+    let id = match id {
+        "settings" | "equalizer" => "home",
+        "songs" => "music",
+        other => other,
+    };
     if id.starts_with("playlist:") && !store::loaded() {
         PENDING.with(|p| *p.borrow_mut() = Some(id.to_string()));
     }
@@ -848,10 +858,16 @@ fn go(id: &str, record: bool) {
             u.history.remove(0);
         }
     }
-    if let Some(prev) = u.nav_items.get(&u.current) {
+    let nav_key = |page: &str| -> String {
+        match page {
+            "music" | "albums" | "artists" | "genres" | "folders" | "recent" => "music".into(),
+            other => other.into(),
+        }
+    };
+    if let Some(prev) = u.nav_items.get(&nav_key(&u.current)) {
         prev.remove_css_class("active");
     }
-    if let Some(b) = u.nav_items.get(&id) {
+    if let Some(b) = u.nav_items.get(&nav_key(&id)) {
         b.add_css_class("active");
     }
     u.stack.set_visible_child_name(&id);

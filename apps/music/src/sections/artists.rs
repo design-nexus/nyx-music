@@ -53,6 +53,7 @@ pub fn build_genres(page: &Page) {
 }
 
 fn build(page: &Page, kind: Kind) {
+    page.body.append(&super::music_chips(if kind == Kind::Artists { "artists" } else { "genres" }));
     page.body.append(&scan_banner());
     let inner = gtk::Stack::new();
     inner.set_transition_type(gtk::StackTransitionType::Crossfade);

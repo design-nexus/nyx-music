@@ -64,47 +64,97 @@ pub fn all() -> Vec<Section> {
             now_playing::build,
             true,
         ),
-        s("songs", "Songs", "music-note-symbolic", "Library", "Every song in your library.", songs::build, true),
-        s("albums", "Albums", "media-optical-symbolic", "Library", "Your albums, by artist.", albums::build, true),
         s(
-            "artists",
-            "Artists",
-            "avatar-default-symbolic",
-            "Library",
-            "Everyone in your library, and their albums.",
-            artists::build_artists,
-            true,
-        ),
-        s("genres", "Genres", "music-genre-symbolic", "Library", "Your music by genre.", artists::build_genres, true),
-        s("folders", "Folders", "folder-music-symbolic", "Library", "Your music as it's laid out on disk.", folders::build, true),
-        s(
-            "recent",
-            "Recent",
-            "document-open-recent-symbolic",
-            "Library",
-            "The albums that joined your library last, and the songs you've played lately and most.",
-            smart::build,
+            "music",
+            "Music",
+            "media-optical-symbolic",
+            "Listen",
+            "Your albums, songs, artists and folders.",
+            songs::build,
             true,
         ),
         s(
-            "radio",
-            "Radio",
-            "music-radio-symbolic",
-            "Online",
-            "Thousands of stations from around the world, by genre and country.",
-            radio::build,
+            "audiobooks",
+            "Audiobooks",
+            "accessories-dictionary-symbolic",
+            "Listen",
+            "Your audiobook libraries and listening positions.",
+            crate::audiobookshelf::ui::build,
             true,
         ),
         s(
             "podcasts",
             "Podcasts",
             "music-podcast-symbolic",
-            "Online",
+            "Listen",
             "Shows you follow, the charts, and every episode to stream or download.",
             podcasts::build,
             true,
         ),
-        s("queue", "Up next", "music-queue-symbolic", "Playlists", "What's playing now and next.", queue::build, true),
+        s(
+            "radio",
+            "Radio",
+            "music-radio-symbolic",
+            "Listen",
+            "Thousands of stations from around the world, by genre and country.",
+            radio::build,
+            true,
+        ),
+        s(
+            "downloads",
+            "Downloads",
+            "folder-download-symbolic",
+            "Library",
+            "Downloaded audiobooks and podcast episodes.",
+            crate::audiobookshelf::ui::downloads_page,
+            false,
+        ),
+        s("queue", "Up next", "music-queue-symbolic", "Library", "What's playing now and next.", queue::build, true),
+        // Music browsing lives under the Music page as chips, not as sidebar rows.
+        Section {
+            nav: false,
+            ..s("albums", "Albums", "media-optical-symbolic", "Listen", "Your albums, by artist.", albums::build, true)
+        },
+        Section {
+            nav: false,
+            ..s(
+                "artists",
+                "Artists",
+                "avatar-default-symbolic",
+                "Listen",
+                "Everyone in your library, and their albums.",
+                artists::build_artists,
+                true,
+            )
+        },
+        Section {
+            nav: false,
+            ..s("genres", "Genres", "music-genre-symbolic", "Listen", "Your music by genre.", artists::build_genres, true)
+        },
+        Section {
+            nav: false,
+            ..s(
+                "folders",
+                "Folders",
+                "folder-music-symbolic",
+                "Listen",
+                "Your music as it's laid out on disk.",
+                folders::build,
+                true,
+            )
+        },
+        Section {
+            nav: false,
+            ..s(
+                "recent",
+                "Recent",
+                "document-open-recent-symbolic",
+                "Listen",
+                "The albums that joined your library last, and the songs you've played lately and most.",
+                smart::build,
+                true,
+            )
+        },
         // Opened from the top bar as a card over the window, not listed in the sidebar.
         Section {
             nav: false,
@@ -144,6 +194,30 @@ pub fn all() -> Vec<Section> {
             )
         },
     ]
+}
+
+/// Chips on Music pages: Songs / Albums / Artists / Genres / Folders / Recent.
+pub fn music_chips(active: &str) -> gtk::Box {
+    let row = widgets::hbox(6);
+    row.add_css_class("music-chips");
+    row.set_margin_bottom(8);
+    for (id, label) in [
+        ("music", "Songs"),
+        ("albums", "Albums"),
+        ("artists", "Artists"),
+        ("genres", "Genres"),
+        ("folders", "Folders"),
+        ("recent", "Recent"),
+    ] {
+        let b = gtk::Button::with_label(label);
+        b.add_css_class("chip");
+        if id == active {
+            b.add_css_class("selected");
+        }
+        b.connect_clicked(move |_| crate::window::navigate(id));
+        row.append(&b);
+    }
+    row
 }
 
 /// A banner that shows while the library is being scanned.

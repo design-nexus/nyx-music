@@ -2,9 +2,9 @@
 //! sortable columns, multi-select, a right-click menu, double-click to play,
 //! and drag-and-drop onto playlists in the sidebar.
 
+use crate::indicator::Indicator;
 use crate::library::{Kind, Track, store};
 use crate::sections::{albums, playlist, podcasts};
-use crate::indicator::Indicator;
 use crate::{cmd, fmt, player, prefs, widgets, window};
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
@@ -659,7 +659,10 @@ impl TrackTable {
             let view = self.view.downgrade();
             move || {
                 DRAGGING.with(|d| {
-                    d.borrow().as_ref().filter(|(v, _)| v.upgrade().is_some() && v.upgrade() == view.upgrade()).map(|(_, r)| r.clone())
+                    d.borrow()
+                        .as_ref()
+                        .filter(|(v, _)| v.upgrade().is_some() && v.upgrade() == view.upgrade())
+                        .map(|(_, r)| r.clone())
                 })
             }
         };
@@ -794,7 +797,7 @@ impl TrackTable {
                 main.append(&item("Show podcast", Box::new(move || podcasts::show(&feed))));
             }
             Kind::Station => main.append(&item("Show radio", Box::new(|| window::navigate("radio")))),
-            Kind::Episode => {}
+            Kind::Audiobook | Kind::Episode => {}
         }
         if !opts.extra.is_empty() {
             main.append(&gtk::Separator::new(gtk::Orientation::Horizontal));

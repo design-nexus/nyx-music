@@ -37,6 +37,7 @@ enum Command {
     Loop(String),
     Shuffle(bool),
     Volume(f64),
+    Rate(f64),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -59,6 +60,7 @@ struct Snapshot {
     shuffle: bool,
     volume: f64,
     position_us: i64,
+    rate: f64,
     at: Instant,
     can_next: bool,
     can_previous: bool,
@@ -75,6 +77,7 @@ impl Default for Snapshot {
             shuffle: false,
             volume: 1.0,
             position_us: 0,
+            rate: 1.0,
             at: Instant::now(),
             can_next: false,
             can_previous: false,
@@ -87,7 +90,11 @@ impl Default for Snapshot {
 
 impl Snapshot {
     fn position(&self) -> i64 {
-        if self.status == "Playing" { self.position_us + self.at.elapsed().as_micros() as i64 } else { self.position_us }
+        if self.status == "Playing" {
+            self.position_us + (self.at.elapsed().as_micros() as f64 * self.rate) as i64
+        } else {
+            self.position_us
+        }
     }
 }
 
@@ -268,11 +275,13 @@ impl Player {
 
     #[zbus(property)]
     fn rate(&self) -> f64 {
-        1.0
+        self.snap().rate
     }
 
     #[zbus(property)]
-    fn set_rate(&mut self, _value: f64) {}
+    fn set_rate(&mut self, value: f64) {
+        self.send(Command::Rate(value));
+    }
 
     #[zbus(property)]
     fn shuffle(&self) -> bool {
@@ -306,12 +315,12 @@ impl Player {
 
     #[zbus(property)]
     fn minimum_rate(&self) -> f64 {
-        1.0
+        0.5
     }
 
     #[zbus(property)]
     fn maximum_rate(&self) -> f64 {
-        1.0
+        3.0
     }
 
     #[zbus(property)]
@@ -366,6 +375,7 @@ fn serve(state: Shared, tx: async_channel::Sender<Command>, signals: mpsc::Recei
                             "Shuffle" => guard.shuffle_changed(emitter).await?,
                             "Metadata" => guard.metadata_changed(emitter).await?,
                             "Volume" => guard.volume_changed(emitter).await?,
+                            "Rate" => guard.rate_changed(emitter).await?,
                             "CanGoNext" => guard.can_go_next_changed(emitter).await?,
                             "CanGoPrevious" => guard.can_go_previous_changed(emitter).await?,
                             "CanPause" => guard.can_pause_changed(emitter).await?,
@@ -418,6 +428,7 @@ fn snapshot() -> Snapshot {
         shuffle: player::shuffle(),
         volume: if p.muted { 0.0 } else { p.volume },
         position_us: (player::position() * 1e6) as i64,
+        rate: crate::audiobookshelf::playback::rate(),
         at: Instant::now(),
         can_next: player::can_next(),
         can_previous: player::can_previous(),
@@ -429,6 +440,7 @@ fn snapshot() -> Snapshot {
 
 fn handle(app: &gtk::Application, c: Command) {
     match c {
+        Command::Rate(rate) => crate::audiobookshelf::playback::set_rate(rate),
         Command::Raise => window::present(app, None),
         Command::Quit => app.quit(),
         Command::Play => player::play(),
@@ -495,6 +507,9 @@ pub fn start(app: &gtk::Application) {
         let mut changed = Vec::new();
         {
             let prev = last.borrow();
+            if (prev.rate - now.rate).abs() > 1e-6 {
+                changed.push("Rate");
+            }
             if prev.status != now.status {
                 changed.push("PlaybackStatus");
             }

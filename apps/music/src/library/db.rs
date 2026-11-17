@@ -10,6 +10,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 const SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS abs_records (
+    kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+    PRIMARY KEY(kind, key)
+);
 CREATE TABLE IF NOT EXISTS tracks (
     id INTEGER PRIMARY KEY,
     path TEXT NOT NULL UNIQUE,

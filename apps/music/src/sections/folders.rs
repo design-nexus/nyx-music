@@ -66,6 +66,7 @@ fn model_for(nodes: &[Rc<Node>]) -> gio::ListStore {
 }
 
 pub fn build(page: &Page) {
+    page.body.append(&super::music_chips("folders"));
     page.body.append(&scan_banner());
     let inner = gtk::Stack::new();
     inner.set_transition_type(gtk::StackTransitionType::Crossfade);

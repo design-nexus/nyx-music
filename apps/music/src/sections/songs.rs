@@ -8,6 +8,7 @@ use crate::{fmt, views};
 use gtk::prelude::*;
 
 pub fn build(page: &Page) {
+    page.body.append(&super::music_chips("music"));
     page.body.append(&scan_banner());
     let content = widgets::vbox(0);
     let toolbar = widgets::hbox(12);

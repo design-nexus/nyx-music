@@ -24,6 +24,8 @@ pub fn is_audio(path: &std::path::Path) -> bool {
 pub enum Kind {
     #[default]
     File,
+    /// Provider-backed spoken media with a stable identity, not a stream URL.
+    Audiobook,
     /// An internet radio station: live, no length, can't seek.
     Station,
     /// A podcast episode (or any other audio on the web).

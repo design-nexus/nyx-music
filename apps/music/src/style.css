@@ -1318,3 +1318,150 @@ window.music-window button.episode-play {
 window.music-window button.episode-play:hover {
   background: alpha(@theme_accent, 0.26);
 }
+
+/* Provider settings use separate shared cards, with a stacked sign-in form. */
+window.music-window .abs-settings-card {
+  padding: 14px;
+}
+window.music-window .abs-card-heading image {
+  color: @theme_accent;
+}
+window.music-window .abs-settings-card .settings-option {
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+window.music-window .abs-connection-error {
+  background: alpha(@theme_danger, 0.08);
+  border-radius: var(--nyx-radius-small);
+  padding: 10px;
+}
+window.music-window .abs-connection-error label.error {
+  color: @theme_danger;
+}
+
+/* ---------- Audiobooks (direction A) ---------- */
+
+window.music-window .music-chips {
+  margin-bottom: 4px;
+}
+
+window.music-window .abs-ptool {
+  margin-bottom: 4px;
+}
+
+window.music-window .abs-main {
+  padding: 4px 4px 16px;
+}
+
+window.music-window .abs-shead {
+  margin: 14px 0 10px;
+}
+
+window.music-window .abs-shead-title {
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+window.music-window .abs-cont-strip {
+  margin-bottom: 6px;
+}
+
+window.music-window .abs-cont-card {
+  padding: 10px;
+  border-radius: var(--nyx-radius-card, 10px);
+  background: @card_bg;
+  box-shadow: inset 0 0 0 1px @hairline;
+  min-width: 280px;
+  max-width: 320px;
+}
+
+window.music-window .abs-cont-title {
+  font-weight: 600;
+}
+
+window.music-window .abs-cont-left {
+  font-size: 0.85em;
+  color: @theme_dim_text;
+  font-feature-settings: "tnum";
+}
+
+window.music-window button.abs-play-ib {
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 999px;
+  background: @theme_accent;
+  color: @theme_on_accent;
+}
+
+window.music-window button.abs-play-ib:hover {
+  background: mix(@theme_accent, @theme_text, 0.12);
+}
+
+window.music-window .abs-book {
+  min-width: 0;
+}
+
+window.music-window flowbox.abs-agrid > flowboxchild {
+  padding: 0;
+  background: transparent;
+}
+
+window.music-window .abs-book-title {
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+window.music-window .abs-book-author {
+  margin-top: 2px;
+  font-size: 0.92em;
+  color: @theme_dim_text;
+}
+
+window.music-window .abs-pbar-mini {
+  margin-top: 6px;
+  min-height: 3px;
+}
+
+window.music-window .abs-pbar-mini trough {
+  min-height: 3px;
+  border-radius: 2px;
+  background: alpha(@theme_text, 0.1);
+}
+
+window.music-window .abs-pbar-mini progress {
+  min-height: 3px;
+  border-radius: 2px;
+  background: @theme_accent;
+}
+
+window.music-window .abs-offline-dot {
+  background: alpha(@theme_bg, 0.55);
+  border-radius: 999px;
+  padding: 3px;
+  color: @theme_text;
+}
+
+window.music-window .abs-now-panel {
+  padding: 12px;
+  border-radius: var(--nyx-radius-card, 10px);
+  background: alpha(@theme_text, 0.04);
+  box-shadow: inset 0 0 0 1px @hairline;
+}
+
+window.music-window button.abs-ch {
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+window.music-window button.abs-ch.active {
+  background: alpha(@theme_accent, 0.14);
+  color: @theme_accent;
+}
+
+window.music-window .abs-banner {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--nyx-radius-small, 6px);
+  background: alpha(@theme_warning, 0.14);
+}

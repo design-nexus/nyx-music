@@ -4,6 +4,7 @@
 pub mod engine;
 pub mod queue;
 
+use crate::audiobookshelf::playback as spoken;
 use crate::library::{Kind, Track, store};
 use crate::{cmd, online, paths, prefs, window};
 use engine::{Engine, Frame};
@@ -108,6 +109,10 @@ pub fn subscribe_global(f: impl Fn(Event) + 'static) {
     GLOBAL.with(|g| g.borrow_mut().push(Rc::new(f)));
 }
 
+pub fn provider_event(e: Event) {
+    emit(e);
+}
+
 fn emit(e: Event) {
     let fs: Vec<Callback> = LISTENERS.with(|l| {
         let mut l = l.borrow_mut();
@@ -184,18 +189,30 @@ pub fn has_eq() -> bool {
 }
 
 pub fn current() -> Option<Rc<Track>> {
+    if spoken::active() {
+        return spoken::track();
+    }
     with(|p| p.current.clone()).flatten()
 }
 
 pub fn state() -> State {
+    if spoken::active() {
+        return spoken::state();
+    }
     with(|p| p.state).unwrap_or(State::Stopped)
 }
 
 pub fn position() -> f64 {
+    if spoken::active() {
+        return spoken::position();
+    }
     with(|p| p.position).unwrap_or(0.0)
 }
 
 pub fn duration() -> f64 {
+    if spoken::active() {
+        return spoken::duration();
+    }
     with(|p| p.duration).unwrap_or(0.0)
 }
 
@@ -215,10 +232,16 @@ pub fn metadata_changed() {
 }
 
 pub fn queue_items() -> (Vec<PathBuf>, Option<usize>) {
+    if spoken::active() {
+        return (vec![], None);
+    }
     with(|p| (p.queue.items.clone(), p.queue.cursor)).unwrap_or_default()
 }
 
 pub fn upcoming(n: usize) -> Vec<PathBuf> {
+    if spoken::active() {
+        return vec![];
+    }
     with(|p| {
         let start = p.queue.cursor.map_or(0, |c| c + 1);
         p.queue.items.iter().skip(start).take(n).cloned().collect()
@@ -227,18 +250,30 @@ pub fn upcoming(n: usize) -> Vec<PathBuf> {
 }
 
 pub fn shuffle() -> bool {
+    if spoken::active() {
+        return false;
+    }
     with(|p| p.queue.shuffled()).unwrap_or(false)
 }
 
 pub fn repeat() -> Repeat {
+    if spoken::active() {
+        return Repeat::Off;
+    }
     with(|p| p.queue.repeat).unwrap_or(Repeat::Off)
 }
 
 pub fn can_next() -> bool {
+    if spoken::active() {
+        return spoken::current_book().is_some_and(|b| b.chapters.iter().any(|c| c.start > spoken::position() + 1.0));
+    }
     with(|p| p.queue.cursor.is_some_and(|c| c + 1 < p.queue.items.len() || p.queue.repeat != Repeat::Off)).unwrap_or(false)
 }
 
 pub fn can_previous() -> bool {
+    if spoken::active() {
+        return true;
+    }
     with(|p| p.current.is_some()).unwrap_or(false)
 }
 
@@ -424,6 +459,7 @@ fn adopt_current() {
 }
 
 fn load_current(play: bool) {
+    spoken::deactivate();
     cancel_xfade();
     // A resume seek only applies to the song it was saved for.
     with(|p| p.pending_seek = None);
@@ -475,6 +511,9 @@ fn load_current(play: bool) {
 }
 
 fn tick() {
+    if spoken::active() {
+        return;
+    }
     let mut count: Option<Rc<Track>> = None;
     let mut progress: Option<(PathBuf, f64, bool)> = None;
     let playing = with(|p| {
@@ -725,6 +764,7 @@ fn cancel_xfade() {
 // ---------- Commands ----------
 
 pub fn play_tracks(paths: Vec<PathBuf>, start: usize) {
+    spoken::deactivate();
     if paths.is_empty() {
         return;
     }
@@ -760,6 +800,10 @@ pub fn play_next(paths: Vec<PathBuf>) {
 }
 
 pub fn play() {
+    if spoken::active() {
+        spoken::play();
+        return;
+    }
     match state() {
         State::Playing => {}
         State::Paused => {
@@ -785,6 +829,10 @@ pub fn play() {
 }
 
 pub fn pause() {
+    if spoken::active() {
+        spoken::pause();
+        return;
+    }
     if state() != State::Playing {
         return;
     }
@@ -801,6 +849,9 @@ pub fn pause() {
 }
 
 fn save_episode_progress() {
+    if spoken::active() {
+        return;
+    }
     if let Some(t) = current().filter(|t| t.kind == Kind::Episode) {
         let (pos, dur) = (position(), duration());
         if pos > 5.0 && (dur <= 0.0 || pos < dur * 0.95) {
@@ -814,6 +865,10 @@ pub fn toggle() {
 }
 
 pub fn stop() {
+    if spoken::active() {
+        spoken::stop();
+        return;
+    }
     cancel_xfade();
     with(|p| {
         if let Some(e) = p.engine.as_mut() {
@@ -827,6 +882,10 @@ pub fn stop() {
 }
 
 pub fn next() {
+    if spoken::active() {
+        spoken::chapter(true);
+        return;
+    }
     let playing = state() != State::Paused;
     if with(|p| p.queue.advance(true)).flatten().is_some() {
         load_current(playing);
@@ -834,6 +893,10 @@ pub fn next() {
 }
 
 pub fn previous() {
+    if spoken::active() {
+        spoken::chapter(false);
+        return;
+    }
     if position() > 3.0 {
         seek(0.0);
         return;
@@ -845,6 +908,10 @@ pub fn previous() {
 }
 
 pub fn seek(secs: f64) {
+    if spoken::active() {
+        spoken::seek(secs);
+        return;
+    }
     if is_live() {
         return;
     }
@@ -938,6 +1005,7 @@ pub fn clear() {
 /// Play through output `id` (PipeWire's node name; "" for the system's default) from
 /// now on, carrying on where it was.
 pub fn set_output(id: &str) {
+    spoken::output(id);
     prefs::update(|p| p.output = id.to_string());
     cancel_xfade();
     with(|p| {
@@ -979,6 +1047,9 @@ pub fn set_muted(muted: bool) {
 }
 
 pub fn set_shuffle(on: bool) {
+    if spoken::active() {
+        return;
+    }
     prefs::update(|p| p.shuffle = on);
     with(|p| p.queue.set_shuffle(on));
     queue_changed();
@@ -986,6 +1057,9 @@ pub fn set_shuffle(on: bool) {
 }
 
 pub fn set_repeat(r: Repeat) {
+    if spoken::active() {
+        return;
+    }
     prefs::update(|p| p.repeat = r.id().to_string());
     with(|p| p.queue.repeat = r);
     queue_changed();
@@ -1052,6 +1126,7 @@ fn apply_gain() {
 
 /// Push the equalizer and gain settings to the engine.
 pub fn apply_eq() {
+    spoken::equalizer();
     let p = prefs::get();
     let bands = if p.eq_enabled { p.eq_bands } else { [0.0; 10] };
     with(|pl| {
@@ -1206,12 +1281,7 @@ mod tests {
 
     #[test]
     fn crossfade_skips_songs_that_run_on() {
-        let t = |album: &str, n: u32| Track {
-            album: album.into(),
-            artist: "A".into(),
-            track_no: Some(n),
-            ..Default::default()
-        };
+        let t = |album: &str, n: u32| Track { album: album.into(), artist: "A".into(), track_no: Some(n), ..Default::default() };
         assert!(continues_album(&t("Live", 3), &t("Live", 4)));
         assert!(!continues_album(&t("Live", 3), &t("Live", 5)));
         assert!(!continues_album(&t("Live", 3), &t("Other", 4)));

@@ -37,7 +37,7 @@ app_info() {
     torrents) ids="Torrents" old_bins="torrents" deps="libtorrent-rasterbar boost" defaults=true ;;
     pdf) ids="Pdf" old_bins="pdf" deps="poppler-glib" defaults=true ;;
     notepad) ids="Notepad" old_bins="notepad" ;;
-    music) ids="Music" old_bins="music" deps="gstreamer gst-plugins-base gst-plugins-good gst-libav" defaults=true actions="nyx-music" ;;
+    music) ids="Music" old_bins="music" deps="gstreamer gst-plugins-base gst-plugins-good gst-libav libsecret" defaults=true actions="nyx-music" ;;
     media-player) ids="MediaPlayer" old_bins="media-player" deps="mpv ffmpeg" defaults=true ;;
     theater) ids="Theater" deps="mpv ffmpeg libsecret" ;;
     chat) ids="Chat" old_bins="chat" ;;

@@ -1,8 +1,8 @@
 use crate::library::store;
 use crate::widgets::{self, Page};
 use crate::{fmt, paths, player, prefs, spectrum, window};
-use gtk::prelude::*;
 use gtk::gio;
+use gtk::prelude::*;
 use std::path::PathBuf;
 
 /// Pick a folder and add it to the library (the empty states use this too).
@@ -79,14 +79,20 @@ fn refresh_folders() {
 
 pub fn build(page: &Page) {
     let p = prefs::get();
+    crate::audiobookshelf::settings::build(page);
 
     // ----- Library -----
     let g = page.group("Library");
-    let (row, _) = widgets::choice_row("Sort albums by", "Order of albums in the library.",
-        widgets::opts(store::ALBUM_SORTS), &p.album_sort, |id| {
+    let (row, _) = widgets::choice_row(
+        "Sort albums by",
+        "Order of albums in the library.",
+        widgets::opts(store::ALBUM_SORTS),
+        &p.album_sort,
+        |id| {
             prefs::update(|p| p.album_sort = id);
             store::notify(store::Change::Library);
-        });
+        },
+    );
     g.add(&row);
     let list = widgets::vbox(6);
     g.add(&list);
@@ -229,7 +235,6 @@ pub fn build(page: &Page) {
             spectrum::redraw_all();
         });
     g.add(&r);
-
 }
 
 /// Your country, for local stations and the podcast charts. The list comes

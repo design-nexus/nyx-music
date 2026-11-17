@@ -2,12 +2,12 @@
 Type=Application
 Name=Music
 GenericName=Music Player
-Comment=Play your music library, with playlists, an equalizer and a spectrum analyzer
+Comment=Music, radio, podcasts and Audiobookshelf audiobooks
 Exec=nyx-music %U
 Icon=io.github.design_nexus.nyx.Music
 Terminal=false
 Categories=AudioVideo;Audio;Player;GTK;
-Keywords=music;player;audio;songs;albums;playlist;equalizer;spectrum;mp3;flac;
+Keywords=audiobooks;audiobookshelf;podcasts;music;player;audio;songs;albums;playlist;equalizer;spectrum;mp3;flac;
 MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-vorbis+ogg;audio/opus;audio/x-opus+ogg;audio/mp4;audio/x-m4a;audio/aac;audio/x-wav;audio/x-aiff;audio/x-ape;audio/x-wavpack;audio/x-musepack;audio/x-mpegurl;audio/mpegurl;
 StartupNotify=true
 StartupWMClass=io.github.design_nexus.nyx.Music
